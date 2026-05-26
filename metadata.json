@@ -1,0 +1,6 @@
+{
+  "name": "Civil Complaint Classifier",
+  "description": "A full-stack civil complaint classification platform featuring automated file parsing, single complaint routing, and specific department classification approvals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
