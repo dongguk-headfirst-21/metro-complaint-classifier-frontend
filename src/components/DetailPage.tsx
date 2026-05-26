@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from "react";
 import { FileEntry, ComplaintEntry, DepartmentSummary, UNCLASSIFIED } from "../types";
-import { ArrowLeft, CheckSquare, Square, FolderCheck, XSquare, Info, ShieldAlert, Loader2, Send } from "lucide-react";
+import { ArrowLeft, CheckSquare, Square, FolderCheck, Info, ShieldAlert, Loader2, Send } from "lucide-react";
 
 interface DetailPageProps {
   file: FileEntry;
@@ -31,8 +31,13 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
           setComplaints(data);
           
           // Compute unique classified departments (excluding Unclassified for the main list, as requested)
-          // Setup initial selected departments from the file's confirmed departments list
-          setSelectedDepts(file.confirmedDepartments || []);
+          // 이미 확인된 부서는 민원 status가 "Confirmed"인 것으로 판별
+          const confirmedDepts = Array.from(new Set<string>(
+            data
+              .filter((c: ComplaintEntry) => c.status === "Confirmed" && c.department !== UNCLASSIFIED)
+              .map((c: ComplaintEntry) => c.department)
+          ));
+          setSelectedDepts(confirmedDepts);
           
           // Auto-select the first department (non-unclassified) to display in the right panel
           const depts = Array.from(
@@ -55,7 +60,7 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
     };
 
     fetchComplaints();
-  }, [file.id, file.confirmedDepartments]);
+  }, [file.id]);
 
   // Group complaints by department
   const nonUnclassifiedComplaints = complaints.filter(c => c.department !== UNCLASSIFIED);
@@ -70,7 +75,7 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
   const departmentSummaries: DepartmentSummary[] = Object.keys(deptMap).map(dept => ({
     department: dept,
     count: deptMap[dept],
-    status: file.confirmedDepartments.includes(dept) ? "Confirmed" : "Pending"
+    status: complaints.some(c => c.department === dept && c.status === "Confirmed") ? "Confirmed" : "Pending"
   }));
 
   const allDeptsList = departmentSummaries.map(s => s.department);
@@ -192,7 +197,7 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
             파일 상세 내역
           </span>
           <h1 className="text-xl font-bold text-slate-900 font-display flex items-center gap-2">
-            {file.filename}
+            {file.name}
           </h1>
         </div>
       </div>

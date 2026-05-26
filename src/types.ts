@@ -5,13 +5,12 @@
 
 export interface FileEntry {
   id: string;
-  filename: string;
-  size: number; // in bytes
-  uploadTimestamp: string;
-  status: 'Uploading' | 'Classifying' | 'Classification Complete';
-  confirmedDepartments: string[]; // names of departments that are confirmed
-  totalDepartments: number; // total unique departments (including Unclassified, or as classified)
-  totalComplaints: number;
+  name: string;
+  capacity: number; // in MB
+  uploadedAt: string; // YYYY-MM-DD
+  status: 'UPLOADING' | 'PENDING' | 'COMPLETED' | 'ERROR';
+  checkedDepartCount: string; // e.g. "1/3"
+  complaintCount: number;
 }
 
 export interface ComplaintEntry {

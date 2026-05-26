@@ -8,7 +8,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
-import { FileEntry, ComplaintEntry } from "./src/types.js"; // Wait: we can use relative imports
+import { ComplaintEntry } from "./src/types.js";
 
 dotenv.config();
 
@@ -17,8 +17,31 @@ const PORT = 3000;
 
 app.use(express.json({ limit: "50mb" }));
 
+interface ServerFile {
+  id: string;
+  name: string;
+  capacity: number;
+  uploadedAt: string;
+  status: 'UPLOADING' | 'PENDING' | 'COMPLETED' | 'ERROR';
+  complaintCount: number;
+  confirmedDepartments: string[];
+  totalDepartments: number;
+}
+
+function toApiFile(f: ServerFile) {
+  return {
+    id: f.id,
+    name: f.name,
+    capacity: f.capacity,
+    uploadedAt: f.uploadedAt,
+    status: f.status,
+    complaintCount: f.complaintCount,
+    checkedDepartCount: `${f.confirmedDepartments.length}/${f.totalDepartments}`
+  };
+}
+
 // In-memory data store for files and complaints
-let files: FileEntry[] = [];
+let files: ServerFile[] = [];
 let complaints: ComplaintEntry[] = [];
 
 // Helper to generate a random COMP-XXXXXXX code
@@ -181,16 +204,16 @@ function generateFallbacksForFilename(filename: string): Array<{ title: string; 
 }
 
 // Direct mock base data for testing
-const SEED_FILES: FileEntry[] = [
+const SEED_FILES: ServerFile[] = [
   {
     id: "f1",
-    filename: "district_complaints_may.txt",
-    size: 2048,
-    uploadTimestamp: "2026-05-26 09:12:00",
-    status: "Classification Complete",
+    name: "district_complaints_may.txt",
+    capacity: 0.002,
+    uploadedAt: "2026-05-26",
+    status: "COMPLETED",
     confirmedDepartments: ["Transportation & Roads"],
     totalDepartments: 3,
-    totalComplaints: 4
+    complaintCount: 4
   }
 ];
 
@@ -243,8 +266,8 @@ complaints = [...SEED_COMPLAINTS];
 // --- SERVER INSTANCE CONTROLLER ---
 
 // List files
-app.get("/api/files", (req, res) => {
-  res.json(files);
+app.get("/api/v1/files", (_req, res) => {
+  res.json({ files: files.map(toApiFile) });
 });
 
 // List complaints
@@ -458,22 +481,22 @@ app.post("/api/upload-file", async (req, res) => {
   // Derive unique departments (excluding those with 0 complaints, and Unclassified is counted if listed)
   const uniqueDepts = Array.from(new Set(processedComplaints.map(c => c.department)));
 
-  const newFileEntry: FileEntry = {
+  const newFileEntry: ServerFile = {
     id: fileId,
-    filename,
-    size: size || 1024,
-    uploadTimestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-    status: "Classification Complete", // The server responds with completed, the client can mock the Uploading -> Classifying sequence beautifully!
+    name: filename,
+    capacity: parseFloat(((size || 1024) / (1024 * 1024)).toFixed(3)),
+    uploadedAt: new Date().toISOString().substring(0, 10),
+    status: "COMPLETED",
     confirmedDepartments: [],
     totalDepartments: uniqueDepts.length,
-    totalComplaints: processedComplaints.length
+    complaintCount: processedComplaints.length
   };
 
   files.push(newFileEntry);
 
   res.json({
     success: true,
-    file: newFileEntry,
+    file: toApiFile(newFileEntry),
     complaints: processedComplaints
   });
 });
@@ -489,19 +512,14 @@ app.post("/api/files/:id/confirm-departments", (req, res) => {
   }
 
   file.confirmedDepartments = confirmedDepartments || [];
-  
-  // Also update corresponding complaints of this file under confirmed departments to "Confirmed"
+
   complaints.forEach(c => {
     if (c.fileId === fileId) {
-      if (confirmedDepartments.includes(c.department)) {
-        c.status = "Confirmed";
-      } else {
-        c.status = "Pending";
-      }
+      c.status = confirmedDepartments.includes(c.department) ? "Confirmed" : "Pending";
     }
   });
 
-  res.json({ success: true, file });
+  res.json({ success: true, file: toApiFile(file) });
 });
 
 // Reset selection of departments (Cancel Confirm)
@@ -514,12 +532,10 @@ app.post("/api/files/:id/reset", (req, res) => {
 
   file.confirmedDepartments = [];
   complaints.forEach(c => {
-    if (c.fileId === fileId) {
-      c.status = "Pending";
-    }
+    if (c.fileId === fileId) c.status = "Pending";
   });
 
-  res.json({ success: true, file });
+  res.json({ success: true, file: toApiFile(file) });
 });
 
 // --- SERVER SETUP ---
