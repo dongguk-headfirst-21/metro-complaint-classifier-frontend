@@ -28,14 +28,17 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
         if (response.ok) {
           const data = await response.json();
           setComplaints(data);
-
+          
+          // Compute unique classified departments (excluding Unclassified for the main list, as requested)
+          // 이미 확인된 부서는 민원 status가 "Confirmed"인 것으로 판별
           const confirmedDepts = Array.from(new Set<string>(
             data
               .filter((c: ComplaintEntry) => c.status === "Confirmed" && c.department !== UNCLASSIFIED)
               .map((c: ComplaintEntry) => c.department)
           ));
           setSelectedDepts(confirmedDepts);
-
+          
+          // Auto-select the first department (non-unclassified) to display in the right panel
           const depts = Array.from(
             new Set(
               data

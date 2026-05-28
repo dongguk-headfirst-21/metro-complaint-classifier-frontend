@@ -27,6 +27,7 @@ export default function FileUploadArea({ onFileUploaded, disabled = false }: Fil
   };
 
   const handleDragOver = (e: React.DragEvent) => {
+    if (disabled) return;
     e.preventDefault();
     if (!disabled) setIsDragging(true);
   };
@@ -61,12 +62,17 @@ export default function FileUploadArea({ onFileUploaded, disabled = false }: Fil
 
   return (
     <div
-      onClick={() => fileInputRef.current?.click()}
+      onClick={() => { if (!disabled) fileInputRef.current?.click(); }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`relative flex flex-col items-center justify-center h-48 px-6 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300 group
-        ${isDragging ? "border-blue-500 bg-blue-50/50" : "border-slate-200 hover:border-slate-300 bg-white"}`}
+      className={`relative flex flex-col items-center justify-center h-48 px-6 border-2 border-dashed rounded-xl transition-all duration-300 group
+        ${disabled
+          ? "border-slate-200 bg-slate-50 cursor-not-allowed opacity-60"
+          : isDragging
+            ? "border-blue-500 bg-blue-50/50 cursor-pointer"
+            : "border-slate-200 hover:border-slate-300 bg-white cursor-pointer"
+        }`}
     >
       <input
         type="file"
@@ -74,10 +80,23 @@ export default function FileUploadArea({ onFileUploaded, disabled = false }: Fil
         onChange={handleFileChange}
         className="hidden"
         accept=".xlsx"
+        disabled={disabled}
       />
 
       <div className="flex flex-col items-center text-center">
-        {lastUploaded ? (
+        {disabled ? (
+          <>
+            <div className="flex items-center justify-center w-12 h-12 mb-3 rounded-full bg-amber-50 text-amber-500">
+              <Loader2 className="w-6 h-6 animate-spin" />
+            </div>
+            <p className="text-sm font-semibold text-slate-600 font-display">
+              분류 처리 중...
+            </p>
+            <p className="text-xs text-slate-400 mt-1">
+              처리가 완료된 후 업로드할 수 있습니다
+            </p>
+          </>
+        ) : lastUploaded ? (
           <>
             <div className="flex items-center justify-center w-12 h-12 mb-3 rounded-full bg-emerald-50 text-emerald-500">
               <CheckCircle className="w-6 h-6 animate-bounce" />
@@ -94,7 +113,9 @@ export default function FileUploadArea({ onFileUploaded, disabled = false }: Fil
             <p className="text-sm font-medium text-slate-700">
               <span className="font-semibold text-slate-900 font-display">클릭하여 업로드</span> 또는 드래그 앤 드롭
             </p>
-            <p className="text-xs text-slate-400 mt-1">.xlsx 파일만 지원 (최대 10MB)</p>
+            <p className="text-xs text-slate-400 mt-1">
+              엑셀 파일 (.xlsx) 만 지원 (최대 10MB)
+            </p>
           </>
         )}
       </div>

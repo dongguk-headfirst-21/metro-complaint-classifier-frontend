@@ -40,9 +40,11 @@ function toApiFile(f: ServerFile) {
   };
 }
 
+// In-memory data store for files and complaints
 let files: ServerFile[] = [];
 let complaints: ComplaintEntry[] = [];
 
+// Helper to generate a random 6-digit complaint code
 function generateComplaintCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
@@ -73,15 +75,15 @@ function fallbackClassifyText(title: string, content: string): string {
   const rules = [
     {
       dept: "경영지원실 정보운영센터",
-      keywords: ["앱", "홈페이지", "전산", "시스템", "Wi-Fi", "와이파이", "전광판", "정보", "모바일", "연동", "데이터", "오류", "장애"]
+      keywords: ["앱", "홈페이지", "전산", "시스템", "Wi-Fi", "와이파이", "전광판", "정보", "모바일", "연동", "데이터", "오류", "장애", "CCTV 시스템"]
     },
     {
       dept: "영업본부 영업사업소",
-      keywords: ["분실물", "불친절", "환불", "장애인", "노약자", "고객센터", "안내", "역무원", "유아차", "표지판", "역무실", "청결", "화장실", "쓰레기"]
+      keywords: ["분실물", "불친절", "환불", "장애인", "노약자", "고객센터", "안내", "역무원", "유아차", "민원처리", "표지판", "역무실"]
     },
     {
       dept: "차량본부 차량사업소",
-      keywords: ["좌석", "손잡이", "스크린도어", "냉방", "난방", "낙서", "음식물", "악취", "차량", "열차 내", "차내", "열차내"]
+      keywords: ["좌석", "손잡이", "스크린도어", "냉방", "난방", "낙서", "음식물", "악취", "차량", "열차 내", "차내"]
     },
     {
       dept: "승무본부 승무사업소",
@@ -89,7 +91,7 @@ function fallbackClassifyText(title: string, content: string): string {
     },
     {
       dept: "기술본부 기계처",
-      keywords: ["에스컬레이터", "엘리베이터", "누수", "조명", "발매기", "환기", "미끄러", "CCTV", "고장", "설비", "기계", "전기"]
+      keywords: ["에스컬레이터", "엘리베이터", "누수", "조명", "발매기", "환기", "미끄러", "CCTV", "고장", "시설", "설비", "기계", "전기"]
     }
   ];
 
@@ -102,24 +104,28 @@ function fallbackClassifyText(title: string, content: string): string {
   return "미분류";
 }
 
+// Generate fallback dummy complaints if the file uploaded has no parsed text
 function generateFallbacksForFilename(_filename: string): Array<{ title: string; content: string; department: string }> {
   return [
-    { title: "또타 앱 강제 종료", content: "서울교통공사 또타 앱이 열차 정보 조회 중 자주 강제 종료되어 이용에 큰 불편이 있습니다.", department: "경영지원실 정보운영센터" },
+    { title: "또타 앱 강제 종료", content: "서울교통공사 또타 앱이 열차 정보 조회 중 자주 강제 종료되어 이용에 불편합니다.", department: "경영지원실 정보운영센터" },
+    { title: "홈페이지 접속 장애", content: "서울교통공사 공식 홈페이지가 업무 시간 중 자주 다운됩니다.", department: "경영지원실 정보운영센터" },
     { title: "역내 공공 Wi-Fi 불량", content: "지하철 역사 내 공공 와이파이가 자주 끊겨 이용이 어렵습니다.", department: "경영지원실 정보운영센터" },
-    { title: "전광판 열차 도착 정보 오류", content: "승강장 전광판의 열차 도착 시간이 실제와 다르게 표시되어 불편합니다.", department: "경영지원실 정보운영센터" },
     { title: "분실물 미처리", content: "열차 내에 지갑을 두고 내렸는데 분실물 센터에 문의해도 처리가 되지 않고 있습니다.", department: "영업본부 영업사업소" },
     { title: "역무원 불친절 응대", content: "역사 내 문의 사항을 물어봤더니 역무원이 무례하게 응대하였습니다.", department: "영업본부 영업사업소" },
     { title: "역사 화장실 청결 불량", content: "수원역 지하 화장실이 오염되어 있어 즉시 청소가 필요합니다.", department: "영업본부 영업사업소" },
     { title: "열차 냉방 고장", content: "운행 중인 2호선 열차 내 냉방이 작동하지 않아 매우 덥습니다.", department: "차량본부 차량사업소" },
     { title: "스크린도어 오작동", content: "잠실역 2호선 승강장 스크린도어가 제대로 열리지 않아 승객들이 불편을 겪습니다.", department: "차량본부 차량사업소" },
-    { title: "출근 시간대 열차 지연", content: "2호선 오전 출근 시간대에 자주 10분 이상 지연이 발생합니다.", department: "승무본부 승무사업소" },
+    { title: "열차 내 낙서 훼손", content: "4호선 열차 좌석 및 창문에 낙서가 심하게 되어 있어 미관을 해치고 있습니다.", department: "차량본부 차량사업소" },
+    { title: "출근 시간대 열차 지연", content: "2호선 오전 출근 시간대에 자주 10분 이상 지연이 발생하여 직장인들에게 큰 불편을 주고 있습니다.", department: "승무본부 승무사업소" },
     { title: "열차 급정차", content: "5호선 열차가 역 사이 구간에서 갑자기 급정차하여 서 있던 승객이 넘어질 뻔했습니다.", department: "승무본부 승무사업소" },
+    { title: "사전 공지 없는 운행 취소", content: "사전 공지 없이 열차가 갑자기 운행 취소되어 많은 승객이 불편을 겪었습니다.", department: "승무본부 승무사업소" },
     { title: "에스컬레이터 고장", content: "강남역 3번 출구 에스컬레이터가 이틀째 고장난 상태입니다. 노약자 승객이 이용하기 매우 불편합니다.", department: "기술본부 기계처" },
-    { title: "역사 내 누수", content: "당산역 지하 통로 천장에서 누수가 발생하고 있어 미끄럼 사고 위험이 있습니다.", department: "기술본부 기계처" },
+    { title: "역사 내 누수", content: "당산역 지하 통로 천장에서 누수가 발생하고 있어 바닥이 젖어 미끄럼 사고 위험이 있습니다.", department: "기술본부 기계처" },
     { title: "자동발매기 고장", content: "종로3가역 1번 출구 앞 자동발매기가 고장나 있어 교통카드 충전이 불가능합니다.", department: "기술본부 기계처" }
   ];
 }
 
+// Direct mock base data for testing
 const SEED_FILES: ServerFile[] = [
   {
     id: "f1",
@@ -163,15 +169,15 @@ const SEED_COMPLAINTS: ComplaintEntry[] = [
   { id: "c24", fileId: "f1", title: "스크린도어 오작동", content: "잠실역 2호선 승강장 스크린도어가 제대로 열리지 않아 승객들이 불편을 겪고 있습니다.", department: "차량본부 차량사업소", complaintCode: "492124", status: "Pending", createdAt: "2026-05-26 10:15:00" },
   { id: "c25", fileId: "f1", title: "열차 내 악취 발생", content: "특정 열차 칸에서 심한 악취가 지속적으로 발생하여 탑승 환경이 매우 불쾌합니다.", department: "차량본부 차량사업소", complaintCode: "492125", status: "Pending", createdAt: "2026-05-26 10:20:00" },
   { id: "c26", fileId: "f1", title: "열차 내 낙서 훼손", content: "4호선 열차 좌석 및 창문에 낙서가 심하게 되어 있어 미관을 심각하게 해치고 있습니다.", department: "차량본부 차량사업소", complaintCode: "492126", status: "Pending", createdAt: "2026-05-26 10:25:00" },
-  { id: "c27", fileId: "f1", title: "열차 내 음식물 냄새", content: "분당선 열차 내에서 음식물 냄새가 심하여 탑승 환경이 불쾌합니다.", department: "차량본부 차량사업소", complaintCode: "492127", status: "Pending", createdAt: "2026-05-26 10:30:00" },
+  { id: "c27", fileId: "f1", title: "열차 내 음식물 냄새", content: "분당선 열차 내에서 음식물 냄새가 심하여 탑승 환경이 불쾌합니다. 음식물 섭취 금지 안내 강화가 필요합니다.", department: "차량본부 차량사업소", complaintCode: "492127", status: "Pending", createdAt: "2026-05-26 10:30:00" },
   { id: "c28", fileId: "f1", title: "열차 난방 불량", content: "겨울철 운행 중인 열차 내 난방이 작동하지 않아 매우 춥습니다.", department: "차량본부 차량사업소", complaintCode: "492128", status: "Pending", createdAt: "2026-05-26 10:35:00" },
   { id: "c29", fileId: "f1", title: "열차 내 조명 불량", content: "1호선 열차 내 조명 일부가 꺼져 있어 어두워 불편합니다.", department: "차량본부 차량사업소", complaintCode: "492129", status: "Pending", createdAt: "2026-05-26 10:40:00" },
   { id: "c30", fileId: "f1", title: "차량 내 안내방송 불량", content: "열차 내 안내방송 볼륨이 너무 낮아 정거장 이름을 듣기 어렵습니다.", department: "차량본부 차량사업소", complaintCode: "492130", status: "Pending", createdAt: "2026-05-26 10:45:00" },
   // 승무본부 승무사업소 (10건)
   { id: "c31", fileId: "f1", title: "출근 시간대 열차 지연", content: "2호선 오전 출근 시간대에 자주 10분 이상 지연이 발생하여 직장인들에게 큰 불편을 주고 있습니다.", department: "승무본부 승무사업소", complaintCode: "492131", status: "Pending", createdAt: "2026-05-26 11:00:00" },
-  { id: "c32", fileId: "f1", title: "9호선 배차 간격 과다", content: "9호선 급행 배차 간격이 너무 넓어 승강장에서 장시간 대기해야 합니다.", department: "승무본부 승무사업소", complaintCode: "492132", status: "Pending", createdAt: "2026-05-26 11:05:00" },
+  { id: "c32", fileId: "f1", title: "9호선 배차 간격 과다", content: "9호선 급행 배차 간격이 너무 넓어 승강장에서 장시간 대기해야 합니다. 배차 확대가 필요합니다.", department: "승무본부 승무사업소", complaintCode: "492132", status: "Pending", createdAt: "2026-05-26 11:05:00" },
   { id: "c33", fileId: "f1", title: "열차 급정차", content: "5호선 열차가 역 사이 구간에서 갑자기 급정차하여 서 있던 승객이 넘어질 뻔했습니다.", department: "승무본부 승무사업소", complaintCode: "492133", status: "Pending", createdAt: "2026-05-26 11:10:00" },
-  { id: "c34", fileId: "f1", title: "출퇴근 열차 극심한 혼잡", content: "출퇴근 시간대 1호선 열차가 너무 혼잡하여 도저히 탑승이 불가능한 상황입니다.", department: "승무본부 승무사업소", complaintCode: "492134", status: "Pending", createdAt: "2026-05-26 11:15:00" },
+  { id: "c34", fileId: "f1", title: "출퇴근 열차 극심한 혼잡", content: "출퇴근 시간대 1호선 열차가 너무 혼잡하여 도저히 탑승이 불가능한 상황입니다. 증차가 필요합니다.", department: "승무본부 승무사업소", complaintCode: "492134", status: "Pending", createdAt: "2026-05-26 11:15:00" },
   { id: "c35", fileId: "f1", title: "막차 시간 이른 문제", content: "3호선 막차 시간이 너무 일러서 심야 시간대 귀가가 매우 불편합니다.", department: "승무본부 승무사업소", complaintCode: "492135", status: "Pending", createdAt: "2026-05-26 11:20:00" },
   { id: "c36", fileId: "f1", title: "사전 공지 없는 운행 취소", content: "사전 공지 없이 열차가 갑자기 운행 취소되어 많은 승객이 불편을 겪었습니다.", department: "승무본부 승무사업소", complaintCode: "492136", status: "Pending", createdAt: "2026-05-26 11:25:00" },
   { id: "c37", fileId: "f1", title: "환승역 연결 열차 지연", content: "특정 역에서 환승 열차 출발이 지연되어 다음 연결 열차를 자주 놓치고 있습니다.", department: "승무본부 승무사업소", complaintCode: "492137", status: "Pending", createdAt: "2026-05-26 11:30:00" },
@@ -198,6 +204,7 @@ complaints = [...SEED_COMPLAINTS];
 
 // --- API ROUTES ---
 
+// List files
 app.get("/api/v1/files", (_req, res) => {
   res.json({ files: files.map(toApiFile) });
 });
@@ -283,7 +290,11 @@ app.post("/api/manual-complaint", async (req, res) => {
 
   complaints.push(newComplaint);
 
-  res.json({ success, department: assignedDept, complaintCode: newCode });
+  res.json({
+    success,
+    department: assignedDept,
+    complaintCode: newCode
+  });
 });
 
 app.post("/api/upload-file", async (req, res) => {
@@ -314,7 +325,7 @@ app.post("/api/upload-file", async (req, res) => {
       파일 내용:
       ${textContent}
 
-      가능한 많은 민원을 추출하세요.`;
+      가능한 많은 민원을 추출하세요. 일반적으로 텍스트 크기에 따라 2~6개의 민원이 있습니다.`;
 
       const schema = {
         type: Type.OBJECT,
