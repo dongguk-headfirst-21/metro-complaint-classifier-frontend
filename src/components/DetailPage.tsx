@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from "react";
 import { FileEntry, ComplaintEntry, DepartmentSummary, UNCLASSIFIED } from "../types";
-import { ArrowLeft, CheckSquare, Square, FolderCheck, XSquare, Info, ShieldAlert, Loader2, Send } from "lucide-react";
+import { ArrowLeft, CheckSquare, Square, FolderCheck, Info, ShieldAlert, Loader2, Send } from "lucide-react";
 
 interface DetailPageProps {
   file: FileEntry;
@@ -21,7 +21,6 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
   const [isFinishing, setIsFinishing] = useState(false);
   const [showDispatchAnimation, setShowDispatchAnimation] = useState(false);
 
-  // Load complaints for this file
   useEffect(() => {
     const fetchComplaints = async () => {
       try {
@@ -29,12 +28,14 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
         if (response.ok) {
           const data = await response.json();
           setComplaints(data);
-          
-          // Compute unique classified departments (excluding Unclassified for the main list, as requested)
-          // Setup initial selected departments from the file's confirmed departments list
-          setSelectedDepts(file.confirmedDepartments || []);
-          
-          // Auto-select the first department (non-unclassified) to display in the right panel
+
+          const confirmedDepts = Array.from(new Set<string>(
+            data
+              .filter((c: ComplaintEntry) => c.status === "Confirmed" && c.department !== UNCLASSIFIED)
+              .map((c: ComplaintEntry) => c.department)
+          ));
+          setSelectedDepts(confirmedDepts);
+
           const depts = Array.from(
             new Set(
               data
@@ -42,10 +43,8 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
                 .map((c: ComplaintEntry) => c.department)
             )
           ) as string[];
-          
-          if (depts.length > 0) {
-            setActiveDept(depts[0]);
-          }
+
+          if (depts.length > 0) setActiveDept(depts[0]);
         }
       } catch (err) {
         console.error("Failed to load complaints:", err);
@@ -55,13 +54,11 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
     };
 
     fetchComplaints();
-  }, [file.id, file.confirmedDepartments]);
+  }, [file.id]);
 
-  // Group complaints by department
   const nonUnclassifiedComplaints = complaints.filter(c => c.department !== UNCLASSIFIED);
   const unclassifiedComplaints = complaints.filter(c => c.department === UNCLASSIFIED);
 
-  // Group into department summary rows
   const deptMap: { [key: string]: number } = {};
   nonUnclassifiedComplaints.forEach(c => {
     deptMap[c.department] = (deptMap[c.department] || 0) + 1;
@@ -70,14 +67,13 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
   const departmentSummaries: DepartmentSummary[] = Object.keys(deptMap).map(dept => ({
     department: dept,
     count: deptMap[dept],
-    status: file.confirmedDepartments.includes(dept) ? "Confirmed" : "Pending"
+    status: complaints.some(c => c.department === dept && c.status === "Confirmed") ? "Confirmed" : "Pending"
   }));
 
   const allDeptsList = departmentSummaries.map(s => s.department);
 
-  // Select all checkbox handlers
   const isSelectAllChecked = departmentSummaries.length > 0 && selectedDepts.length === departmentSummaries.length;
-  
+
   const handleSelectAll = () => {
     if (isSelectAllChecked) {
       setSelectedDepts([]);
@@ -92,12 +88,10 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
     );
   };
 
-  // Right panel complaints
-  const activeDeptComplaints = activeDept 
+  const activeDeptComplaints = activeDept
     ? complaints.filter(c => c.department === activeDept)
     : [];
 
-  // Confirm Final classification results
   const handleConfirm = async () => {
     setIsFinishing(true);
     try {
@@ -108,13 +102,12 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
       });
 
       if (response.ok) {
-        // Trigger a gorgeous success modal dispatching state
         setShowDispatchAnimation(true);
         setTimeout(() => {
           setShowDispatchAnimation(false);
           setIsFinishing(false);
-          onRefresh(); // refresh the parent state info in dashboards
-          onBack(); // go back to dashboard
+          onRefresh();
+          onBack();
         }, 3200);
       } else {
         setIsFinishing(false);
@@ -125,7 +118,6 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
     }
   };
 
-  // Cancel Confirm resets selections
   const handleCancelConfirm = async () => {
     setIsFinishing(true);
     try {
@@ -157,7 +149,6 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
 
   return (
     <div className="relative min-h-[600px] flex flex-col">
-      {/* Dispatching Animation Backdrop Overlay */}
       {showDispatchAnimation && (
         <div className="fixed inset-0 z-55 bg-slate-900/90 backdrop-blur-md flex flex-col items-center justify-center text-center p-6 text-white">
           <div className="relative w-24 h-24 mb-6 flex items-center justify-center">
@@ -178,12 +169,11 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
         </div>
       )}
 
-      {/* Header bar */}
       <div className="flex items-center gap-4 mb-6">
         <button
           onClick={onBack}
           className="flex items-center justify-center p-2.5 rounded-xl border border-slate-200 bg-white shadow-xs text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition"
-          aria-label="Back to dashboard"
+          aria-label="대시보드로 돌아가기"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -192,25 +182,21 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
             파일 상세 내역
           </span>
           <h1 className="text-xl font-bold text-slate-900 font-display flex items-center gap-2">
-            {file.filename}
+            {file.name}
           </h1>
         </div>
       </div>
 
-      {/* Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch flex-1">
-        
-        {/* LEFT COLUMN: Department Classification List (span 5) */}
+
         <div className="lg:col-span-5 flex flex-col justify-between bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden h-[630px]">
-          
           <div className="flex-1 flex flex-col min-h-0">
-            {/* Header / Select All */}
             <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
               <button
                 onClick={handleSelectAll}
                 disabled={departmentSummaries.length === 0}
                 className="text-slate-500 hover:text-slate-700 transition"
-                aria-label="Select all departments"
+                aria-label="전체 부서 선택"
               >
                 {isSelectAllChecked ? (
                   <CheckSquare className="w-5 h-5 text-blue-600" />
@@ -223,12 +209,9 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
               </span>
             </div>
 
-            {/* Department List */}
             <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
               {departmentSummaries.length === 0 ? (
-                <div className="p-8 text-center text-slate-400 text-xs">
-                  분류된 부서가 없습니다.
-                </div>
+                <div className="p-8 text-center text-slate-400 text-xs">분류된 부서가 없습니다.</div>
               ) : (
                 departmentSummaries.map((summary) => {
                   const isChecked = selectedDepts.includes(summary.department);
@@ -237,11 +220,7 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
                     <div
                       key={summary.department}
                       onClick={() => setActiveDept(summary.department)}
-                      className={`flex items-center justify-between px-6 py-3.5 cursor-pointer transition ${
-                        isActive
-                          ? "bg-slate-50"
-                          : "hover:bg-slate-50/50"
-                      }`}
+                      className={`flex items-center justify-between px-6 py-3.5 cursor-pointer transition ${isActive ? "bg-slate-50" : "hover:bg-slate-50/50"}`}
                     >
                       <div className="flex items-center gap-3 min-w-0" onClick={(e) => e.stopPropagation()}>
                         <button
@@ -254,9 +233,7 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
                             <Square className="w-5 h-5" />
                           )}
                         </button>
-                        <span className={`text-sm font-semibold truncate ${
-                          isActive ? "text-blue-700" : "text-slate-700"
-                        }`}>
+                        <span className={`text-sm font-semibold truncate ${isActive ? "text-blue-700" : "text-slate-700"}`}>
                           {summary.department}
                         </span>
                       </div>
@@ -265,8 +242,6 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
                         <span className="text-xs font-mono font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
                           {summary.count} 건
                         </span>
-                        
-                        {/* Status tag */}
                         <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
                           summary.status === "Confirmed"
                             ? "bg-emerald-50 text-emerald-700"
@@ -281,13 +256,11 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
               )}
             </div>
 
-            {/* UNCLASSIFIED COMPLAINTS: Fixed box at bottom of left column */}
             <div className="p-5 border-t border-slate-200 bg-slate-50/70">
               <div className="flex items-center gap-1.5 text-xs font-bold text-amber-800 uppercase tracking-widest mb-3">
                 <ShieldAlert className="w-4 h-4 text-amber-600" />
                 미분류 민원함 (읽기 전용)
               </div>
-              
               <div className="max-h-[130px] overflow-y-auto space-y-3 bg-white border border-slate-150 p-3 rounded-lg shadow-2xs">
                 {unclassifiedComplaints.length === 0 ? (
                   <p className="text-[11px] text-slate-400 italic">미분류 민원이 없습니다.</p>
@@ -297,7 +270,7 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
                       <h5 className="text-xs font-bold text-slate-800 font-display">
                         {idx + 1}. {c.title}
                       </h5>
-                      <p className="text-[11px] text-slate-500 mt-1 leading-relaxed text-wrap">
+                      <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
                         {c.content}
                       </p>
                       <span className="text-[9px] font-mono font-bold text-slate-400 mt-1 block">
@@ -308,10 +281,8 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
                 )}
               </div>
             </div>
-
           </div>
 
-          {/* ACTION BUTTONS PANEL: Fixed at the very bottom of the page container left column */}
           <div className="p-4 border-t border-slate-100 bg-slate-50 bg-slate-100/55 flex items-center justify-end gap-3 shrink-0">
             <button
               onClick={handleCancelConfirm}
@@ -338,10 +309,8 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
               )}
             </button>
           </div>
-
         </div>
 
-        {/* RIGHT COLUMN: Complaint Detail list panel (span 7) */}
         <div className="lg:col-span-7 flex flex-col bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden h-[630px]">
           <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-slate-800 tracking-tight font-display flex items-center gap-2">
@@ -369,28 +338,23 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
                   className="p-5 rounded-xl border border-slate-150 bg-white shadow-2xs hover:border-blue-200 transition-all duration-300 relative group overflow-hidden"
                 >
                   <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-600 opacity-60"></div>
-                  
                   <div className="flex items-start justify-between gap-4 mb-2">
-                    <h3 className="text-sm font-bold text-slate-800 font-display">
-                      {c.title}
-                    </h3>
+                    <h3 className="text-sm font-bold text-slate-800 font-display">{c.title}</h3>
                     <span className="font-mono text-[10px] font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
                       {c.complaintCode}
                     </span>
                   </div>
-                  
-                  <p className="text-xs text-slate-600 leading-relaxed text-wrap whitespace-pre-wrap">
+                  <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">
                     {c.content}
                   </p>
-                  
                   <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-mono">
                     <span>접수: {c.createdAt}</span>
                     <span className={`font-bold px-1.5 py-0.5 rounded ${
-                      c.status === "Confirmed" 
-                        ? "bg-emerald-50 text-emerald-600" 
+                      c.status === "Confirmed"
+                        ? "bg-emerald-50 text-emerald-600"
                         : "bg-slate-100 text-slate-500"
                     }`}>
-                      {c.status.toUpperCase()}
+                      {c.status === "Confirmed" ? "확인됨" : "대기 중"}
                     </span>
                   </div>
                 </div>

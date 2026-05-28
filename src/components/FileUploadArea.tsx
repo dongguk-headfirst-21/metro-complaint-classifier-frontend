@@ -4,48 +4,39 @@
  */
 
 import React, { useState, useRef } from "react";
-import { UploadCloud, FileText, CheckCircle } from "lucide-react";
+import { UploadCloud, CheckCircle, Loader2 } from "lucide-react";
 
 interface FileUploadAreaProps {
   onFileUploaded: (filename: string, size: number, textContent: string) => void;
+  disabled?: boolean;
 }
 
-export default function FileUploadArea({ onFileUploaded }: FileUploadAreaProps) {
+export default function FileUploadArea({ onFileUploaded, disabled = false }: FileUploadAreaProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [lastUploaded, setLastUploaded] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const processFile = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result as string || "";
-      onFileUploaded(file.name, file.size, text);
-      setLastUploaded(file.name);
-      setTimeout(() => setLastUploaded(null), 4000);
-    };
-    // For TXT or log files read as text, otherwise just send empty string which triggers name-based generation
-    if (file.type.startsWith("text/") || file.name.endsWith(".txt") || file.name.endsWith(".json") || file.name.endsWith(".csv")) {
-      reader.readAsText(file);
-    } else {
-      // Just execute drop action with empty text content
-      onFileUploaded(file.name, file.size, "");
-      setLastUploaded(file.name);
-      setTimeout(() => setLastUploaded(null), 4000);
+    if (!file.name.endsWith(".xlsx")) {
+      alert(".xlsx 파일만 업로드할 수 있습니다.");
+      return;
     }
+    onFileUploaded(file.name, file.size, "");
+    setLastUploaded(file.name);
+    setTimeout(() => setLastUploaded(null), 4000);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragging(true);
+    if (!disabled) setIsDragging(true);
   };
 
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
+  const handleDragLeave = () => setIsDragging(false);
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
+    if (disabled) return;
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       processFile(e.dataTransfer.files[0]);
     }
@@ -54,8 +45,19 @@ export default function FileUploadArea({ onFileUploaded }: FileUploadAreaProps) 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       processFile(e.target.files[0]);
+      e.target.value = "";
     }
   };
+
+  if (disabled) {
+    return (
+      <div className="relative flex flex-col items-center justify-center h-48 px-6 border-2 border-dashed rounded-xl border-slate-200 bg-slate-50 cursor-not-allowed">
+        <Loader2 className="w-8 h-8 text-slate-400 animate-spin mb-3" />
+        <p className="text-sm font-semibold text-slate-500 font-display">분류 처리 중...</p>
+        <p className="text-xs text-slate-400 mt-1">처리가 완료된 후 업로드할 수 있습니다.</p>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -64,18 +66,14 @@ export default function FileUploadArea({ onFileUploaded }: FileUploadAreaProps) 
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={`relative flex flex-col items-center justify-center h-48 px-6 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300 group
-        ${
-          isDragging
-            ? "border-blue-500 bg-blue-50/50"
-            : "border-slate-200 hover:border-slate-300 bg-white"
-        }`}
+        ${isDragging ? "border-blue-500 bg-blue-50/50" : "border-slate-200 hover:border-slate-300 bg-white"}`}
     >
       <input
         type="file"
         ref={fileInputRef}
         onChange={handleFileChange}
         className="hidden"
-        accept=".txt,.csv,.json,.pdf,.doc,.docx"
+        accept=".xlsx"
       />
 
       <div className="flex flex-col items-center text-center">
@@ -84,26 +82,19 @@ export default function FileUploadArea({ onFileUploaded }: FileUploadAreaProps) 
             <div className="flex items-center justify-center w-12 h-12 mb-3 rounded-full bg-emerald-50 text-emerald-500">
               <CheckCircle className="w-6 h-6 animate-bounce" />
             </div>
-            <p className="text-sm font-semibold text-slate-800 font-display">
-              업로드 완료!
-            </p>
-            <p className="text-xs text-slate-500 mt-1 max-w-[250px] truncate font-mono">
-              {lastUploaded}
-            </p>
+            <p className="text-sm font-semibold text-slate-800 font-display">업로드 완료!</p>
+            <p className="text-xs text-slate-500 mt-1 max-w-[250px] truncate font-mono">{lastUploaded}</p>
           </>
         ) : (
           <>
             <div className={`flex items-center justify-center w-12 h-12 mb-3 rounded-full transition-transform duration-300 group-hover:scale-110
-              ${isDragging ? "bg-blue-100 text-blue-600" : "bg-slate-50 text-slate-400"}`}
-            >
+              ${isDragging ? "bg-blue-100 text-blue-600" : "bg-slate-50 text-slate-400"}`}>
               <UploadCloud className="w-6 h-6" />
             </div>
             <p className="text-sm font-medium text-slate-700">
               <span className="font-semibold text-slate-900 font-display">클릭하여 업로드</span> 또는 드래그 앤 드롭
             </p>
-            <p className="text-xs text-slate-400 mt-1">
-              .txt, .csv, .json, .pdf 파일 지원 (최대 10MB)
-            </p>
+            <p className="text-xs text-slate-400 mt-1">.xlsx 파일만 지원 (최대 10MB)</p>
           </>
         )}
       </div>

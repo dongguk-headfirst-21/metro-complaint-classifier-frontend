@@ -5,7 +5,7 @@
 
 import React from "react";
 import { FileEntry } from "../types";
-import { Trash2, AlertCircle, FileText, ArrowRight, Loader2, CheckCircle2 } from "lucide-react";
+import { Trash2, FileText, ArrowRight, Loader2, CheckCircle2 } from "lucide-react";
 
 interface ComplaintListTableProps {
   files: FileEntry[];
@@ -18,35 +18,39 @@ export default function ComplaintListTable({
   onDeleteRequest,
   onSelectFile,
 }: ComplaintListTableProps) {
-  const formatSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  const formatCapacity = (mb: number) => {
+    if (mb === 0) return "0 KB";
+    if (mb < 1) return (mb * 1024).toFixed(1) + " KB";
+    return mb.toFixed(1) + " MB";
   };
 
   const getStatusBadge = (status: FileEntry["status"]) => {
     switch (status) {
-      case "Uploading":
+      case "UPLOADING":
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100 animate-pulse-subtle">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100 animate-pulse">
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
             업로드 중
           </span>
         );
-      case "Classifying":
+      case "PENDING":
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
             분류 중
           </span>
         );
-      case "Classification Complete":
+      case "COMPLETED":
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
             분류 완료
+          </span>
+        );
+      case "ERROR":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-100">
+            오류 발생
           </span>
         );
       default:
@@ -80,7 +84,7 @@ export default function ComplaintListTable({
                 <th className="px-6 py-3.5">파일명</th>
                 <th className="px-6 py-3.5">크기</th>
                 <th className="px-6 py-3.5 text-center">민원 수</th>
-                <th className="px-6 py-3.5">업로드 시간</th>
+                <th className="px-6 py-3.5">업로드 일자</th>
                 <th className="px-6 py-3.5">분류 상태</th>
                 <th className="px-6 py-3.5 text-center">확인 / 전체 부서</th>
                 <th className="px-6 py-3.5 text-center">삭제</th>
@@ -88,31 +92,22 @@ export default function ComplaintListTable({
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {files.map((file) => {
-                const isComplete = file.status === "Classification Complete";
+                const isComplete = file.status === "COMPLETED";
+                const [confirmed, total] = file.checkedDepartCount.split("/").map(Number);
                 return (
                   <tr
                     key={file.id}
-                    onClick={() => {
-                      if (isComplete) {
-                        onSelectFile(file.id);
-                      }
-                    }}
-                    className={`group transition-colors ${
-                      isComplete
-                        ? "cursor-pointer hover:bg-slate-50/70"
-                        : "opacity-80"
-                    }`}
+                    onClick={() => { if (isComplete) onSelectFile(file.id); }}
+                    className={`group transition-colors ${isComplete ? "cursor-pointer hover:bg-slate-50/70" : "opacity-80"}`}
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${
-                          isComplete ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-400"
-                        }`}>
-                          <FileText className="w-4.5 h-4.5" />
+                        <div className={`p-2 rounded-lg ${isComplete ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-400"}`}>
+                          <FileText className="w-4 h-4" />
                         </div>
                         <div>
                           <span className="text-sm font-semibold text-slate-800 font-display block group-hover:text-blue-700 transition">
-                            {file.filename}
+                            {file.name}
                           </span>
                           {isComplete && (
                             <span className="text-[10px] text-blue-600 font-medium group-hover:underline flex items-center gap-0.5 mt-0.5">
@@ -123,13 +118,13 @@ export default function ComplaintListTable({
                       </div>
                     </td>
                     <td className="px-6 py-4 text-xs font-mono text-slate-500">
-                      {formatSize(file.size)}
+                      {formatCapacity(file.capacity)}
                     </td>
                     <td className="px-6 py-4 text-sm font-semibold text-center text-slate-800 font-mono">
-                      {isComplete ? file.totalComplaints : "—"}
+                      {isComplete ? file.complaintCount : "—"}
                     </td>
                     <td className="px-6 py-4 text-xs text-slate-500 font-mono">
-                      {file.uploadTimestamp}
+                      {file.uploadedAt}
                     </td>
                     <td className="px-6 py-4">
                       {getStatusBadge(file.status)}
@@ -137,11 +132,9 @@ export default function ComplaintListTable({
                     <td className="px-6 py-4 text-center">
                       {isComplete ? (
                         <div className="inline-flex items-center justify-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 font-mono border border-slate-200">
-                          <span className={file.confirmedDepartments.length === file.totalDepartments ? "text-emerald-600 font-bold" : ""}>
-                            {file.confirmedDepartments.length}
-                          </span>
+                          <span className={confirmed === total && total > 0 ? "text-emerald-600 font-bold" : ""}>{confirmed}</span>
                           <span>/</span>
-                          <span>{file.totalDepartments}</span>
+                          <span>{total}</span>
                         </div>
                       ) : (
                         <span className="text-slate-400 text-xs">—</span>
