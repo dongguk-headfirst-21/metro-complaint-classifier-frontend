@@ -24,10 +24,10 @@ export default function App() {
   // Load files list on startup
   const fetchFiles = async () => {
     try {
-      const response = await fetch("/api/files");
+      const response = await fetch("/api/v1/files");
       if (response.ok) {
         const data = await response.json();
-        setFiles(data);
+        setFiles(data.files);
       }
     } catch (err) {
       console.error("Failed to load files ledger:", err);
@@ -41,18 +41,16 @@ export default function App() {
   // Handle uploaded file triggering client-side visual transitions
   const handleFileUploaded = async (filename: string, size: number, textContent: string) => {
     const tempId = `temp_${Date.now()}`;
-    const timestampStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
 
     // 1. Initial State: Uploading
     const tempUploadingEntry: FileEntry = {
       id: tempId,
-      filename,
-      size,
-      uploadTimestamp: timestampStr,
-      status: "Uploading",
-      confirmedDepartments: [],
-      totalDepartments: 0,
-      totalComplaints: 0
+      name: filename,
+      capacity: parseFloat((size / (1024 * 1024)).toFixed(3)),
+      uploadedAt: new Date().toISOString().substring(0, 10),
+      status: "UPLOADING",
+      checkedDepartCount: "0/0",
+      complaintCount: 0
     };
 
     setFiles(prev => [tempUploadingEntry, ...prev]);
@@ -67,7 +65,7 @@ export default function App() {
     // 2. Scheduled transition: Transition to 'Classifying' after 1.5 seconds
     setTimeout(() => {
       setFiles(prev =>
-        prev.map(f => (f.id === tempId ? { ...f, status: "Classifying" } : f))
+        prev.map(f => (f.id === tempId ? { ...f, status: "PENDING" } : f))
       );
     }, 1500);
 
@@ -179,7 +177,10 @@ export default function App() {
                       민원 목록 파일을 업로드하면 AI를 통해 각 민원을 자동으로 분류하여 담당 부서에 배부합니다.
                     </p>
                   </div>
-                  <FileUploadArea onFileUploaded={handleFileUploaded} />
+                  <FileUploadArea
+                    onFileUploaded={handleFileUploaded}
+                    disabled={files.some(f => f.status === "UPLOADING" || f.status === "PENDING")}
+                  />
                 </div>
               </div>
 
