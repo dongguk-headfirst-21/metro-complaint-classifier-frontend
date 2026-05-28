@@ -18,8 +18,8 @@ export interface ComplaintEntry {
   fileId: string | null; // null for manual complaints
   title: string;
   content: string;
-  department: string; // e.g. 'Transportation & Roads', 'Environmental Health', etc.
-  complaintCode: string; // unique system code e.g. COMP-1029481
+  department: string;
+  complaintCode: string; // unique 6-digit code
   status: 'Pending' | 'Confirmed';
   createdAt: string;
 }

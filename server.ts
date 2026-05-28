@@ -49,23 +49,18 @@ function generateComplaintCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-// Lazy load Gemini client to avoid crashing on start if API key is missing
 let aiClient: GoogleGenAI | null = null;
 function getGeminiClient(): GoogleGenAI | null {
   if (aiClient) return aiClient;
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
-    console.warn("GEMINI_API_KEY environment variable is not defined or is placeholder. Using rule-based fallback classification.");
+    console.warn("GEMINI_API_KEY not set. Using rule-based fallback.");
     return null;
   }
   try {
     aiClient = new GoogleGenAI({
       apiKey,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        },
-      },
+      httpOptions: { headers: { "User-Agent": "aistudio-build" } },
     });
     return aiClient;
   } catch (err) {
@@ -74,7 +69,6 @@ function getGeminiClient(): GoogleGenAI | null {
   }
 }
 
-// Rule-based fallback classifier in case Gemini is unavailable
 function fallbackClassifyText(title: string, content: string): string {
   const text = `${title} ${content}`;
 
@@ -208,14 +202,13 @@ const SEED_COMPLAINTS: ComplaintEntry[] = [
 files = [...SEED_FILES];
 complaints = [...SEED_COMPLAINTS];
 
-// --- SERVER INSTANCE CONTROLLER ---
+// --- API ROUTES ---
 
 // List files
 app.get("/api/v1/files", (_req, res) => {
   res.json({ files: files.map(toApiFile) });
 });
 
-// List complaints
 app.get("/api/complaints", (req, res) => {
   const { fileId } = req.query;
   if (fileId) {
@@ -225,19 +218,17 @@ app.get("/api/complaints", (req, res) => {
   }
 });
 
-// Delete file and associated complaints
 app.delete("/api/files/:id", (req, res) => {
   const fileId = req.params.id;
   files = files.filter(f => f.id !== fileId);
   complaints = complaints.filter(c => c.fileId !== fileId);
-  res.json({ success: true, message: `File ${fileId} and associated complaints deleted.` });
+  res.json({ success: true, message: `File ${fileId} deleted.` });
 });
 
-// Process manual complaint
 app.post("/api/manual-complaint", async (req, res) => {
   const { title, content } = req.body;
   if (!title || !content) {
-    return res.status(400).json({ success: false, message: "Title and Content are required." });
+    return res.status(400).json({ success: false, message: "제목과 내용이 필요합니다." });
   }
 
   const ai = getGeminiClient();
@@ -286,7 +277,6 @@ app.post("/api/manual-complaint", async (req, res) => {
   const newCode = generateComplaintCode();
   const success = assignedDept !== "미분류";
 
-  // Add the manual complaint to memory list just to let it persist, with fileId null
   const newComplaint: ComplaintEntry = {
     id: `c_manual_${Date.now()}`,
     fileId: null,
@@ -307,11 +297,10 @@ app.post("/api/manual-complaint", async (req, res) => {
   });
 });
 
-// Upload and classify a file (bulk complaints)
 app.post("/api/upload-file", async (req, res) => {
   const { filename, size, textContent } = req.body;
   if (!filename) {
-    return res.status(400).json({ success: false, message: "Filename is required" });
+    return res.status(400).json({ success: false, message: "파일명이 필요합니다." });
   }
 
   const fileId = `f_${Date.now()}`;
@@ -375,33 +364,26 @@ app.post("/api/upload-file", async (req, res) => {
         parsedComplaints = parsed.complaints;
       }
     } catch (err) {
-      console.error("Gemini bulk file parsing failed, falling back to rule-based:", err);
+      console.error("Gemini bulk file parsing failed, falling back:", err);
     }
   }
 
-  // If Gemini failed or no textContent provided (like empty or dummy file upload), trigger nice rule-based/content generation
-  if (parsedComplaints.length === 0) {
-    if (textContent && textContent.trim().length > 10) {
-      // Simple parse by splitting double newlines or similar
-      const blocks = textContent.split(/\n\s*\n/).filter((b: string) => b.trim().length > 10);
-      if (blocks.length > 0) {
-        parsedComplaints = blocks.map((block: string, idx: number) => {
-          const lines = block.split("\n").map(l => l.trim()).filter(Boolean);
-          const title = lines[0] ? (lines[0].length > 60 ? lines[0].substring(0, 57) + "..." : lines[0]) : `Complaint #${idx + 1}`;
-          const content = block;
-          const department = fallbackClassifyText(title, content);
-          return { title, content, department };
-        });
-      }
+  if (parsedComplaints.length === 0 && textContent && textContent.trim().length > 10) {
+    const blocks = textContent.split(/\n\s*\n/).filter((b: string) => b.trim().length > 10);
+    if (blocks.length > 0) {
+      parsedComplaints = blocks.map((block: string, idx: number) => {
+        const lines = block.split("\n").map((l: string) => l.trim()).filter(Boolean);
+        const title = lines[0] ? (lines[0].length > 60 ? lines[0].substring(0, 57) + "..." : lines[0]) : `민원 #${idx + 1}`;
+        const department = fallbackClassifyText(title, block);
+        return { title, content: block, department };
+      });
     }
   }
 
-  // If still empty (or it was an empty/dummy file), generate realistic sample complaints based on filename
   if (parsedComplaints.length === 0) {
     parsedComplaints = generateFallbacksForFilename(filename);
   }
 
-  // Register complaints in-memory
   const processedComplaints: ComplaintEntry[] = parsedComplaints.map((pc, idx) => ({
     id: `c_${fileId}_${idx}`,
     fileId,
@@ -409,13 +391,12 @@ app.post("/api/upload-file", async (req, res) => {
     content: pc.content,
     department: pc.department,
     complaintCode: generateComplaintCode(),
-    status: "Pending", // Starts as pending until confirmed on the details page
+    status: "Pending",
     createdAt: new Date().toISOString().replace('T', ' ').substring(0, 19)
   }));
 
   complaints.push(...processedComplaints);
 
-  // Derive unique departments (excluding those with 0 complaints, and Unclassified is counted if listed)
   const uniqueDepts = Array.from(new Set(processedComplaints.map(c => c.department)));
 
   const newFileEntry: ServerFile = {
@@ -438,14 +419,13 @@ app.post("/api/upload-file", async (req, res) => {
   });
 });
 
-// Confirm selected departments classification results for a file
 app.post("/api/files/:id/confirm-departments", (req, res) => {
   const fileId = req.params.id;
-  const { confirmedDepartments } = req.body; // array of department names
+  const { confirmedDepartments } = req.body;
 
   const file = files.find(f => f.id === fileId);
   if (!file) {
-    return res.status(404).json({ success: false, message: "File not found" });
+    return res.status(404).json({ success: false, message: "파일을 찾을 수 없습니다." });
   }
 
   file.confirmedDepartments = confirmedDepartments || [];
@@ -459,12 +439,11 @@ app.post("/api/files/:id/confirm-departments", (req, res) => {
   res.json({ success: true, file: toApiFile(file) });
 });
 
-// Reset selection of departments (Cancel Confirm)
 app.post("/api/files/:id/reset", (req, res) => {
   const fileId = req.params.id;
   const file = files.find(f => f.id === fileId);
   if (!file) {
-    return res.status(404).json({ success: false, message: "File not found" });
+    return res.status(404).json({ success: false, message: "파일을 찾을 수 없습니다." });
   }
 
   file.confirmedDepartments = [];
@@ -478,7 +457,6 @@ app.post("/api/files/:id/reset", (req, res) => {
 // --- SERVER SETUP ---
 
 async function startServer() {
-  // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },

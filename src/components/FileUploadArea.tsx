@@ -17,7 +17,10 @@ export default function FileUploadArea({ onFileUploaded, disabled = false }: Fil
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const processFile = (file: File) => {
-    if (!file.name.endsWith(".xlsx")) return;
+    if (!file.name.endsWith(".xlsx")) {
+      alert(".xlsx 파일만 업로드할 수 있습니다.");
+      return;
+    }
     onFileUploaded(file.name, file.size, "");
     setLastUploaded(file.name);
     setTimeout(() => setLastUploaded(null), 4000);
@@ -26,7 +29,7 @@ export default function FileUploadArea({ onFileUploaded, disabled = false }: Fil
   const handleDragOver = (e: React.DragEvent) => {
     if (disabled) return;
     e.preventDefault();
-    setIsDragging(true);
+    if (!disabled) setIsDragging(true);
   };
 
   const handleDragLeave = () => setIsDragging(false);
@@ -43,8 +46,19 @@ export default function FileUploadArea({ onFileUploaded, disabled = false }: Fil
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       processFile(e.target.files[0]);
+      e.target.value = "";
     }
   };
+
+  if (disabled) {
+    return (
+      <div className="relative flex flex-col items-center justify-center h-48 px-6 border-2 border-dashed rounded-xl border-slate-200 bg-slate-50 cursor-not-allowed">
+        <Loader2 className="w-8 h-8 text-slate-400 animate-spin mb-3" />
+        <p className="text-sm font-semibold text-slate-500 font-display">분류 처리 중...</p>
+        <p className="text-xs text-slate-400 mt-1">처리가 완료된 후 업로드할 수 있습니다.</p>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -87,18 +101,13 @@ export default function FileUploadArea({ onFileUploaded, disabled = false }: Fil
             <div className="flex items-center justify-center w-12 h-12 mb-3 rounded-full bg-emerald-50 text-emerald-500">
               <CheckCircle className="w-6 h-6 animate-bounce" />
             </div>
-            <p className="text-sm font-semibold text-slate-800 font-display">
-              업로드 완료!
-            </p>
-            <p className="text-xs text-slate-500 mt-1 max-w-[250px] truncate font-mono">
-              {lastUploaded}
-            </p>
+            <p className="text-sm font-semibold text-slate-800 font-display">업로드 완료!</p>
+            <p className="text-xs text-slate-500 mt-1 max-w-[250px] truncate font-mono">{lastUploaded}</p>
           </>
         ) : (
           <>
             <div className={`flex items-center justify-center w-12 h-12 mb-3 rounded-full transition-transform duration-300 group-hover:scale-110
-              ${isDragging ? "bg-blue-100 text-blue-600" : "bg-slate-50 text-slate-400"}`}
-            >
+              ${isDragging ? "bg-blue-100 text-blue-600" : "bg-slate-50 text-slate-400"}`}>
               <UploadCloud className="w-6 h-6" />
             </div>
             <p className="text-sm font-medium text-slate-700">

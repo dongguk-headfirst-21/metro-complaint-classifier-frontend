@@ -28,7 +28,7 @@ export default function ComplaintListTable({
     switch (status) {
       case "UPLOADING":
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100 animate-pulse-subtle">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100 animate-pulse">
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
             업로드 중
           </span>
@@ -84,7 +84,7 @@ export default function ComplaintListTable({
                 <th className="px-6 py-3.5">파일명</th>
                 <th className="px-6 py-3.5">크기</th>
                 <th className="px-6 py-3.5 text-center">민원 수</th>
-                <th className="px-6 py-3.5">업로드 시간</th>
+                <th className="px-6 py-3.5">업로드 일자</th>
                 <th className="px-6 py-3.5">분류 상태</th>
                 <th className="px-6 py-3.5 text-center">확인 / 전체 부서</th>
                 <th className="px-6 py-3.5 text-center">삭제</th>
@@ -97,23 +97,13 @@ export default function ComplaintListTable({
                 return (
                   <tr
                     key={file.id}
-                    onClick={() => {
-                      if (isComplete) {
-                        onSelectFile(file.id);
-                      }
-                    }}
-                    className={`group transition-colors ${
-                      isComplete
-                        ? "cursor-pointer hover:bg-slate-50/70"
-                        : "opacity-80"
-                    }`}
+                    onClick={() => { if (isComplete) onSelectFile(file.id); }}
+                    className={`group transition-colors ${isComplete ? "cursor-pointer hover:bg-slate-50/70" : "opacity-80"}`}
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${
-                          isComplete ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-400"
-                        }`}>
-                          <FileText className="w-4.5 h-4.5" />
+                        <div className={`p-2 rounded-lg ${isComplete ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-400"}`}>
+                          <FileText className="w-4 h-4" />
                         </div>
                         <div>
                           <span className="text-sm font-semibold text-slate-800 font-display block group-hover:text-blue-700 transition">
@@ -142,9 +132,7 @@ export default function ComplaintListTable({
                     <td className="px-6 py-4 text-center">
                       {isComplete ? (
                         <div className="inline-flex items-center justify-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 font-mono border border-slate-200">
-                          <span className={confirmed === total ? "text-emerald-600 font-bold" : ""}>
-                            {confirmed}
-                          </span>
+                          <span className={confirmed === total && total > 0 ? "text-emerald-600 font-bold" : ""}>{confirmed}</span>
                           <span>/</span>
                           <span>{total}</span>
                         </div>
