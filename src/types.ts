@@ -31,13 +31,11 @@ export interface DepartmentSummary {
 }
 
 export const DEPARTMENTS = [
-  'Transportation & Roads',
-  'Environmental Health',
-  'Housing & Building Safety',
-  'Public Safety & Policing',
-  'Parks & Recreation',
-  'Social Services',
-  'Finance & Taxation'
+  '경영지원실 정보운영센터',
+  '영업본부 영업사업소',
+  '차량본부 차량사업소',
+  '승무본부 승무사업소',
+  '기술본부 기계처'
 ];
 
-export const UNCLASSIFIED = 'Unclassified';
+export const UNCLASSIFIED = '미분류';

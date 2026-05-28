@@ -391,11 +391,11 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
                   <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-mono">
                     <span>접수: {c.createdAt}</span>
                     <span className={`font-bold px-1.5 py-0.5 rounded ${
-                      c.status === "Confirmed" 
-                        ? "bg-emerald-50 text-emerald-600" 
+                      c.status === "Confirmed"
+                        ? "bg-emerald-50 text-emerald-600"
                         : "bg-slate-100 text-slate-500"
                     }`}>
-                      {c.status.toUpperCase()}
+                      {c.status === "Confirmed" ? "확인됨" : "대기 중"}
                     </span>
                   </div>
                 </div>
