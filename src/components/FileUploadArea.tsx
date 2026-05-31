@@ -7,7 +7,7 @@ import React, { useState, useRef } from "react";
 import { UploadCloud, CheckCircle, Loader2 } from "lucide-react";
 
 interface FileUploadAreaProps {
-  onFileUploaded: (filename: string, size: number, textContent: string) => void;
+  onFileUploaded: (file: File) => void;
   disabled?: boolean;
 }
 
@@ -21,7 +21,7 @@ export default function FileUploadArea({ onFileUploaded, disabled = false }: Fil
       alert(".xlsx 파일만 업로드할 수 있습니다.");
       return;
     }
-    onFileUploaded(file.name, file.size, "");
+    onFileUploaded(file);
     setLastUploaded(file.name);
     setTimeout(() => setLastUploaded(null), 4000);
   };

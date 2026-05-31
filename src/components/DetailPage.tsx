@@ -4,8 +4,21 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { FileEntry, ComplaintEntry, DepartmentSummary, UNCLASSIFIED } from "../types";
+import { FileEntry, ComplaintEntry, UNCLASSIFIED } from "../types";
 import { ArrowLeft, CheckSquare, Square, FolderCheck, Info, ShieldAlert, Loader2, Send } from "lucide-react";
+
+interface DepartSummary {
+  departId: string;
+  name: string;
+  row: number;
+  isChecked: boolean;
+}
+
+interface DepartComplaint {
+  title: string;
+  content: string;
+  code: string;
+}
 
 interface DetailPageProps {
   file: FileEntry;
@@ -15,6 +28,9 @@ interface DetailPageProps {
 
 export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps) {
   const [complaints, setComplaints] = useState<ComplaintEntry[]>([]);
+  const [departSummaries, setDepartSummaries] = useState<DepartSummary[]>([]);
+  const [activeDeptComplaints, setActiveDeptComplaints] = useState<DepartComplaint[]>([]);
+  const [isLoadingComplaints, setIsLoadingComplaints] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
   const [activeDept, setActiveDept] = useState<string | null>(null);
@@ -22,60 +38,39 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
   const [showDispatchAnimation, setShowDispatchAnimation] = useState(false);
 
   useEffect(() => {
-    const fetchComplaints = async () => {
+    const fetchData = async () => {
       try {
-        const response = await fetch(`/api/complaints?fileId=${file.id}`);
-        if (response.ok) {
-          const data = await response.json();
-          setComplaints(data);
-          
-          // Compute unique classified departments (excluding Unclassified for the main list, as requested)
-          // 이미 확인된 부서는 민원 status가 "Confirmed"인 것으로 판별
-          const confirmedDepts = Array.from(new Set<string>(
-            data
-              .filter((c: ComplaintEntry) => c.status === "Confirmed" && c.department !== UNCLASSIFIED)
-              .map((c: ComplaintEntry) => c.department)
-          ));
-          setSelectedDepts(confirmedDepts);
-          
-          // Auto-select the first department (non-unclassified) to display in the right panel
-          const depts = Array.from(
-            new Set(
-              data
-                .filter((c: ComplaintEntry) => c.department !== UNCLASSIFIED)
-                .map((c: ComplaintEntry) => c.department)
-            )
-          ) as string[];
+        const [fileRes, complaintsRes] = await Promise.all([
+          fetch(`/api/v1/files/${file.id}`),
+          fetch(`/api/complaints?fileId=${file.id}`)
+        ]);
 
-          if (depts.length > 0) setActiveDept(depts[0]);
+        if (fileRes.ok) {
+          const fileData = await fileRes.json();
+          const departs: DepartSummary[] = fileData.departs ?? [];
+          setDepartSummaries(departs);
+          setSelectedDepts(departs.filter(d => d.isChecked).map(d => d.name));
+          if (departs.length > 0) setActiveDept(departs[0].name);
+        }
+
+        if (complaintsRes.ok) {
+          setComplaints(await complaintsRes.json());
         }
       } catch (err) {
-        console.error("Failed to load complaints:", err);
+        console.error("Failed to load file detail:", err);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchComplaints();
+    fetchData();
   }, [file.id]);
 
-  const nonUnclassifiedComplaints = complaints.filter(c => c.department !== UNCLASSIFIED);
   const unclassifiedComplaints = complaints.filter(c => c.department === UNCLASSIFIED);
 
-  const deptMap: { [key: string]: number } = {};
-  nonUnclassifiedComplaints.forEach(c => {
-    deptMap[c.department] = (deptMap[c.department] || 0) + 1;
-  });
+  const allDeptsList = departSummaries.map(s => s.name);
 
-  const departmentSummaries: DepartmentSummary[] = Object.keys(deptMap).map(dept => ({
-    department: dept,
-    count: deptMap[dept],
-    status: complaints.some(c => c.department === dept && c.status === "Confirmed") ? "Confirmed" : "Pending"
-  }));
-
-  const allDeptsList = departmentSummaries.map(s => s.department);
-
-  const isSelectAllChecked = departmentSummaries.length > 0 && selectedDepts.length === departmentSummaries.length;
+  const isSelectAllChecked = departSummaries.length > 0 && selectedDepts.length === departSummaries.length;
 
   const handleSelectAll = () => {
     if (isSelectAllChecked) {
@@ -91,17 +86,30 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
     );
   };
 
-  const activeDeptComplaints = activeDept
-    ? complaints.filter(c => c.department === activeDept)
-    : [];
+  useEffect(() => {
+    if (!activeDept) return;
+    const summary = departSummaries.find(d => d.name === activeDept);
+    if (!summary) return;
+
+    setIsLoadingComplaints(true);
+    fetch(`/api/v1/departs/${summary.departId}?page=0&size=50`)
+      .then(res => res.json())
+      .then(data => setActiveDeptComplaints(data.complaints ?? []))
+      .catch(console.error)
+      .finally(() => setIsLoadingComplaints(false));
+  }, [activeDept, departSummaries]);
 
   const handleConfirm = async () => {
     setIsFinishing(true);
     try {
-      const response = await fetch(`/api/files/${file.id}/confirm-departments`, {
-        method: "POST",
+      const selectedDepartIds = departSummaries
+        .filter(d => selectedDepts.includes(d.name))
+        .map(d => d.departId);
+
+      const response = await fetch(`/api/v1/files/${file.id}/departs/check`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirmedDepartments: selectedDepts }),
+        body: JSON.stringify({ departIds: selectedDepartIds }),
       });
 
       if (response.ok) {
@@ -124,8 +132,14 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
   const handleCancelConfirm = async () => {
     setIsFinishing(true);
     try {
-      const response = await fetch(`/api/files/${file.id}/reset`, {
-        method: "POST",
+      const checkedDepartIds = departSummaries
+        .filter(d => d.isChecked)
+        .map(d => d.departId);
+
+      const response = await fetch(`/api/v1/files/${file.id}/departs/uncheck`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ departIds: checkedDepartIds }),
       });
 
       if (response.ok) {
@@ -197,7 +211,7 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
             <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
               <button
                 onClick={handleSelectAll}
-                disabled={departmentSummaries.length === 0}
+                disabled={departSummaries.length === 0}
                 className="text-slate-500 hover:text-slate-700 transition"
                 aria-label="전체 부서 선택"
               >
@@ -213,21 +227,21 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
             </div>
 
             <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
-              {departmentSummaries.length === 0 ? (
+              {departSummaries.length === 0 ? (
                 <div className="p-8 text-center text-slate-400 text-xs">분류된 부서가 없습니다.</div>
               ) : (
-                departmentSummaries.map((summary) => {
-                  const isChecked = selectedDepts.includes(summary.department);
-                  const isActive = activeDept === summary.department;
+                departSummaries.map((summary) => {
+                  const isChecked = selectedDepts.includes(summary.name);
+                  const isActive = activeDept === summary.name;
                   return (
                     <div
-                      key={summary.department}
-                      onClick={() => setActiveDept(summary.department)}
+                      key={summary.departId}
+                      onClick={() => setActiveDept(summary.name)}
                       className={`flex items-center justify-between px-6 py-3.5 cursor-pointer transition ${isActive ? "bg-slate-50" : "hover:bg-slate-50/50"}`}
                     >
                       <div className="flex items-center gap-3 min-w-0" onClick={(e) => e.stopPropagation()}>
                         <button
-                          onClick={() => handleDeptCheckboxToggle(summary.department)}
+                          onClick={() => handleDeptCheckboxToggle(summary.name)}
                           className="text-slate-400 hover:text-slate-600 transition"
                         >
                           {isChecked ? (
@@ -237,20 +251,20 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
                           )}
                         </button>
                         <span className={`text-sm font-semibold truncate ${isActive ? "text-blue-700" : "text-slate-700"}`}>
-                          {summary.department}
+                          {summary.name}
                         </span>
                       </div>
 
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-mono font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-                          {summary.count} 건
+                          {summary.row} 건
                         </span>
                         <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                          summary.status === "Confirmed"
+                          summary.isChecked
                             ? "bg-emerald-50 text-emerald-700"
                             : "bg-amber-50 text-amber-600"
                         }`}>
-                          {summary.status === "Confirmed" ? "확인됨" : "대기 중"}
+                          {summary.isChecked ? "확인됨" : "대기 중"}
                         </span>
                       </div>
                     </div>
@@ -328,38 +342,33 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            {activeDeptComplaints.length === 0 ? (
+            {isLoadingComplaints ? (
+              <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                <Loader2 className="w-6 h-6 animate-spin mb-2" />
+                <p className="text-xs">민원 불러오는 중...</p>
+              </div>
+            ) : activeDeptComplaints.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center text-slate-400">
                 <Info className="w-8 h-8 text-slate-350 stroke-[1.5] mb-2" />
                 <p className="text-sm font-medium">왼쪽에서 부서를 선택하세요</p>
                 <p className="text-xs text-slate-400 mt-1">해당 부서의 분류된 민원을 확인하세요</p>
               </div>
             ) : (
-              activeDeptComplaints.map((c) => (
+              activeDeptComplaints.map((c, idx) => (
                 <div
-                  key={c.id}
+                  key={c.code ?? idx}
                   className="p-5 rounded-xl border border-slate-150 bg-white shadow-2xs hover:border-blue-200 transition-all duration-300 relative group overflow-hidden"
                 >
                   <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-600 opacity-60"></div>
                   <div className="flex items-start justify-between gap-4 mb-2">
                     <h3 className="text-sm font-bold text-slate-800 font-display">{c.title}</h3>
                     <span className="font-mono text-[10px] font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
-                      {c.complaintCode}
+                      {c.code}
                     </span>
                   </div>
                   <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">
                     {c.content}
                   </p>
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-mono">
-                    <span>접수: {c.createdAt}</span>
-                    <span className={`font-bold px-1.5 py-0.5 rounded ${
-                      c.status === "Confirmed"
-                        ? "bg-emerald-50 text-emerald-600"
-                        : "bg-slate-100 text-slate-500"
-                    }`}>
-                      {c.status === "Confirmed" ? "확인됨" : "대기 중"}
-                    </span>
-                  </div>
                 </div>
               ))
             )}

@@ -35,13 +35,37 @@ export default function App() {
     fetchFiles();
   }, []);
 
-  const handleFileUploaded = async (filename: string, size: number, textContent: string) => {
+  useEffect(() => {
+    const es = new EventSource("/api/v1/files/subscribe");
+
+    es.addEventListener("file-status", (e: MessageEvent) => {
+      const { fileId, status } = JSON.parse(e.data) as { fileId: string | number; status: string };
+
+      const statusMap: Record<string, FileEntry["status"]> = {
+        UPLOADING: "UPLOADING",
+        CLASSIFYING: "PENDING",
+        DONE: "COMPLETED",
+      };
+      const mapped = statusMap[status];
+      if (!mapped) return;
+
+      setFiles(prev => prev.map(f => f.id === String(fileId) ? { ...f, status: mapped } : f));
+
+      if (status === "DONE") fetchFiles();
+    });
+
+    es.onerror = () => es.close();
+
+    return () => es.close();
+  }, []);
+
+  const handleFileUploaded = async (file: File) => {
     const tempId = `temp_${Date.now()}`;
 
     const tempUploadingEntry: FileEntry = {
       id: tempId,
-      name: filename,
-      capacity: parseFloat((size / (1024 * 1024)).toFixed(3)),
+      name: file.name,
+      capacity: parseFloat((file.size / (1024 * 1024)).toFixed(3)),
       uploadedAt: new Date().toISOString().substring(0, 10),
       status: "UPLOADING",
       checkedDepartCount: "0/0",
@@ -50,35 +74,31 @@ export default function App() {
 
     setFiles(prev => [tempUploadingEntry, ...prev]);
 
-    const fetchPromise = fetch("/api/upload-file", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filename, size, textContent }),
-    });
-
     setTimeout(() => {
       setFiles(prev =>
         prev.map(f => (f.id === tempId ? { ...f, status: "PENDING" as const } : f))
       );
     }, 1500);
 
-    setTimeout(async () => {
-      try {
-        const res = await fetchPromise;
-        if (res.ok) {
-          const finalResult = await res.json();
-          const serverCreatedFile: FileEntry = finalResult.file;
-          setFiles(prev =>
-            prev.map(f => (f.id === tempId ? serverCreatedFile : f))
-          );
-        } else {
-          setFiles(prev => prev.filter(f => f.id !== tempId));
-        }
-      } catch (err) {
-        console.error("Error finalizing file processing:", err);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/v1/files", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        setFiles(prev => prev.filter(f => f.id !== tempId));
+        await fetchFiles();
+      } else {
         setFiles(prev => prev.filter(f => f.id !== tempId));
       }
-    }, 3500);
+    } catch (err) {
+      console.error("Error uploading file:", err);
+      setFiles(prev => prev.filter(f => f.id !== tempId));
+    }
   };
 
   const handleDeleteRequest = (fileId: string) => {
