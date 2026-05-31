@@ -31,7 +31,7 @@ export default function ManualProcessingPanel() {
     setResult(null);
 
     try {
-      const response = await fetch("/api/manual-complaint", {
+      const response = await fetch("/api/v1/complaints", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title, content }),

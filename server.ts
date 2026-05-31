@@ -209,6 +209,31 @@ app.get("/api/v1/files", (_req, res) => {
   res.json({ files: files.map(toApiFile) });
 });
 
+// File detail — department summaries
+app.get("/api/v1/files/:fileId", (req, res) => {
+  const { fileId } = req.params;
+  const file = files.find(f => f.id === fileId);
+  if (!file) {
+    return res.status(404).json({ success: false, message: "파일을 찾을 수 없습니다." });
+  }
+
+  const fileComplaints = complaints.filter(c => c.fileId === fileId && c.department !== "미분류");
+
+  const deptMap: { [dept: string]: number } = {};
+  fileComplaints.forEach(c => {
+    deptMap[c.department] = (deptMap[c.department] || 0) + 1;
+  });
+
+  const departs = Object.keys(deptMap).map((dept, idx) => ({
+    departId: `dept_${idx + 1}`,
+    name: dept,
+    row: deptMap[dept],
+    isChecked: file.confirmedDepartments.includes(dept)
+  }));
+
+  res.json({ departs });
+});
+
 app.get("/api/complaints", (req, res) => {
   const { fileId } = req.query;
   if (fileId) {
@@ -225,7 +250,7 @@ app.delete("/api/files/:id", (req, res) => {
   res.json({ success: true, message: `File ${fileId} deleted.` });
 });
 
-app.post("/api/manual-complaint", async (req, res) => {
+app.post("/api/v1/complaints", async (req, res) => {
   const { title, content } = req.body;
   if (!title || !content) {
     return res.status(400).json({ success: false, message: "제목과 내용이 필요합니다." });
@@ -291,6 +316,7 @@ app.post("/api/manual-complaint", async (req, res) => {
   complaints.push(newComplaint);
 
   res.json({
+    complaintId: newComplaint.id,
     success,
     department: assignedDept,
     complaintCode: newCode
