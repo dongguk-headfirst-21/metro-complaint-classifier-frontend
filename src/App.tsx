@@ -122,7 +122,7 @@ export default function App() {
   const handleDeleteConfirm = async () => {
     if (!fileIdToDelete) return;
     try {
-      const response = await fetch(`/api/files/${fileIdToDelete}`, {
+      const response = await fetch(`/api/v1/files/${fileIdToDelete}`, {
         method: "DELETE",
       });
       if (response.ok) {
@@ -196,7 +196,7 @@ export default function App() {
                 </div>
               </div>
               <div className="lg:col-span-6">
-                <ManualProcessingPanel />
+                <ManualProcessingPanel disabled={files.some(f => f.status === "UPLOADING" || f.status === "PENDING")} />
               </div>
             </div>
 

@@ -13,7 +13,7 @@ interface ManualResult {
   failureReason: string | null;
 }
 
-export default function ManualProcessingPanel() {
+export default function ManualProcessingPanel({ disabled = false }: { disabled?: boolean }) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -139,13 +139,18 @@ export default function ManualProcessingPanel() {
 
           <button
             type="submit"
-            disabled={isProcessing}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 rounded-lg shadow-xs transition"
+            disabled={isProcessing || disabled}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed rounded-lg shadow-xs transition"
           >
             {isProcessing ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
                 분류 중...
+              </>
+            ) : disabled ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                파일 분류 중...
               </>
             ) : (
               <>
