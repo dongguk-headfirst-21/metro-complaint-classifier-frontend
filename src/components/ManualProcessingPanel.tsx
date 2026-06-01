@@ -3,13 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from "react";
-import { Send, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { Send, CheckCircle2, AlertCircle, Loader2, XCircle } from "lucide-react";
 
 interface ManualResult {
   success: boolean;
   department: string;
   complaintCode: string;
+  failureReason: string | null;
 }
 
 export default function ManualProcessingPanel() {
@@ -18,6 +19,40 @@ export default function ManualProcessingPanel() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<ManualResult | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
+
+  const pendingComplaintId = useRef<string | null>(null);
+  const pendingResultData = useRef<{ department: string; complaintCode: string } | null>(null);
+
+  useEffect(() => {
+    const es = new EventSource("/api/v1/complaints/subscribe");
+
+    es.addEventListener("complaint-status", (e: MessageEvent) => {
+      const data = JSON.parse(e.data) as {
+        complaintId: string | number;
+        departId: number;
+        code: number;
+        failureReason: string | null;
+      };
+
+      if (String(data.complaintId) !== pendingComplaintId.current) return;
+
+      const stored = pendingResultData.current;
+      setResult({
+        success: !data.failureReason,
+        department: stored?.department ?? "",
+        complaintCode: stored?.complaintCode ?? "",
+        failureReason: data.failureReason,
+      });
+
+      pendingComplaintId.current = null;
+      pendingResultData.current = null;
+      setIsProcessing(false);
+    });
+
+    es.onerror = () => es.close();
+
+    return () => es.close();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,24 +72,21 @@ export default function ManualProcessingPanel() {
         body: JSON.stringify({ title, content }),
       });
 
-      if (!response.ok) {
-        throw new Error("민원 처리에 실패했습니다.");
-      }
+      if (!response.ok) throw new Error("민원 처리에 실패했습니다.");
 
       const data = await response.json();
-      setResult({
-        success: data.success,
-        department: data.department,
-        complaintCode: data.complaintCode,
-      });
 
-      // Clear fields upon successful classification
+      pendingComplaintId.current = String(data.complaintId);
+      pendingResultData.current = {
+        department: data.department ?? "",
+        complaintCode: data.complaintCode ?? "",
+      };
+
       setTitle("");
       setContent("");
     } catch (err) {
       console.error(err);
       setErrorMsg("분류 서버 연결 중 오류가 발생했습니다.");
-    } finally {
       setIsProcessing(false);
     }
   };
@@ -113,7 +145,7 @@ export default function ManualProcessingPanel() {
             {isProcessing ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                처리 중...
+                분류 중...
               </>
             ) : (
               <>
@@ -124,42 +156,46 @@ export default function ManualProcessingPanel() {
           </button>
         </form>
 
-        {/* Processing Results Area */}
         {result && (
-          <div className="mt-4 p-4 rounded-xl border border-blue-100 bg-blue-50/20 space-y-3">
-            <h4 className="text-xs font-bold text-blue-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-blue-100/55 pb-1.5">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+          <div className={`mt-4 p-4 rounded-xl border space-y-3 ${
+            result.success ? "border-blue-100 bg-blue-50/20" : "border-rose-100 bg-rose-50/20"
+          }`}>
+            <h4 className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
+              {result.success
+                ? <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                : <XCircle className="w-4 h-4 text-rose-500" />
+              }
               배부 결과
             </h4>
 
-            {/* Crucial Order: success/fail status, assigned department name, unique complaint code */}
             <div className="space-y-2">
               <div>
-                <span className="text-[10px] text-slate-400 font-medium block uppercase tracking-wide">
-                  처리 상태
-                </span>
-                <span className="text-sm font-semibold text-slate-800 block">
-                  {result.success ? "처리 완료" : "실패"}
-                </span>
-              </div>
-              
-              <div>
-                <span className="text-[10px] text-slate-400 font-medium block uppercase tracking-wide">
-                  배부 부서
-                </span>
-                <span className="text-sm font-bold text-slate-900 block font-display">
-                  {result.department}
+                <span className="text-[10px] text-slate-400 font-medium block uppercase tracking-wide">처리 상태</span>
+                <span className={`text-sm font-semibold block ${result.success ? "text-slate-800" : "text-rose-600"}`}>
+                  {result.success ? "처리 완료" : "처리 실패"}
                 </span>
               </div>
 
+              {result.success && (
+                <div>
+                  <span className="text-[10px] text-slate-400 font-medium block uppercase tracking-wide">배부 부서</span>
+                  <span className="text-sm font-bold text-slate-900 block font-display">{result.department}</span>
+                </div>
+              )}
+
               <div>
-                <span className="text-[10px] text-slate-400 font-medium block uppercase tracking-wide">
-                  민원 코드
-                </span>
+                <span className="text-[10px] text-slate-400 font-medium block uppercase tracking-wide">민원 코드</span>
                 <span className="text-xs font-mono font-bold text-blue-700 bg-blue-100/60 px-1.5 py-0.5 rounded block w-max">
                   {result.complaintCode}
                 </span>
               </div>
+
+              {result.failureReason && (
+                <div>
+                  <span className="text-[10px] text-slate-400 font-medium block uppercase tracking-wide">실패 사유</span>
+                  <span className="text-xs text-rose-600 block">{result.failureReason}</span>
+                </div>
+              )}
             </div>
           </div>
         )}
