@@ -10,6 +10,7 @@ import ManualProcessingPanel from "./components/ManualProcessingPanel";
 import ComplaintListTable from "./components/ComplaintListTable";
 import DetailPage from "./components/DetailPage";
 import ConfirmModal from "./components/ConfirmModal";
+import { CheckCircle2, X } from "lucide-react";
 
 export default function App() {
   const [view, setView] = useState<"dashboard" | "detail">("dashboard");
@@ -18,6 +19,12 @@ export default function App() {
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [fileIdToDelete, setFileIdToDelete] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 4000);
+  };
 
   const fetchFiles = async () => {
     try {
@@ -49,7 +56,14 @@ export default function App() {
       const mapped = statusMap[status];
       if (!mapped) return;
 
-      setFiles(prev => prev.map(f => f.id === String(fileId) ? { ...f, status: mapped } : f));
+      setFiles(prev => {
+        const updated = prev.map(f => f.id === String(fileId) ? { ...f, status: mapped } : f);
+        if (status === "DONE") {
+          const done = updated.find(f => f.id === String(fileId));
+          if (done) showToast(`"${done.name}" 분류가 완료됐습니다.`);
+        }
+        return updated;
+      });
 
       if (status === "DONE") fetchFiles();
     });
@@ -74,12 +88,6 @@ export default function App() {
 
     setFiles(prev => [tempUploadingEntry, ...prev]);
 
-    setTimeout(() => {
-      setFiles(prev =>
-        prev.map(f => (f.id === tempId ? { ...f, status: "PENDING" as const } : f))
-      );
-    }, 1500);
-
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -90,8 +98,13 @@ export default function App() {
       });
 
       if (res.ok) {
-        setFiles(prev => prev.filter(f => f.id !== tempId));
-        await fetchFiles();
+        const data = await res.json();
+        const realId = String(data.fileId);
+        // temp 항목을 실제 fileId로 교체하고 PENDING 상태로 유지
+        // SSE에서 DONE 이벤트를 받으면 fetchFiles()로 최종 갱신됨
+        setFiles(prev =>
+          prev.map(f => f.id === tempId ? { ...f, id: realId, status: "PENDING" as const } : f)
+        );
       } else {
         setFiles(prev => prev.filter(f => f.id !== tempId));
       }
@@ -131,6 +144,16 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col antialiased">
+
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 bg-emerald-600 text-white text-sm font-medium rounded-xl shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <span>{toast}</span>
+          <button onClick={() => setToast(null)} className="ml-1 hover:opacity-70 transition">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       <header className="sticky top-0 z-40 w-full bg-[#0f172a] text-white border-b border-slate-800 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -184,6 +207,7 @@ export default function App() {
                 setActiveFileId(fileId);
                 setView("detail");
               }}
+              onRefresh={fetchFiles}
             />
           </div>
         ) : (

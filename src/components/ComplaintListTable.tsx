@@ -5,18 +5,20 @@
 
 import React from "react";
 import { FileEntry } from "../types";
-import { Trash2, FileText, ArrowRight, Loader2, CheckCircle2 } from "lucide-react";
+import { Trash2, FileText, ArrowRight, Loader2, CheckCircle2, RefreshCw } from "lucide-react";
 
 interface ComplaintListTableProps {
   files: FileEntry[];
   onDeleteRequest: (fileId: string) => void;
   onSelectFile: (fileId: string) => void;
+  onRefresh: () => void;
 }
 
 export default function ComplaintListTable({
   files,
   onDeleteRequest,
   onSelectFile,
+  onRefresh,
 }: ComplaintListTableProps) {
   const formatCapacity = (mb: number) => {
     if (mb === 0) return "0 KB";
@@ -65,9 +67,18 @@ export default function ComplaintListTable({
           <FileText className="w-4 h-4 text-slate-500" />
           민원 파일 목록
         </h2>
-        <span className="text-xs font-mono font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-          {files.length} 개
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-mono font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+            {files.length} 개
+          </span>
+          <button
+            onClick={onRefresh}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+            title="새로고침"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
