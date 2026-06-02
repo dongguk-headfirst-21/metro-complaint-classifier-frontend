@@ -10,7 +10,6 @@ import ManualProcessingPanel from "./components/ManualProcessingPanel";
 import ComplaintListTable from "./components/ComplaintListTable";
 import DetailPage from "./components/DetailPage";
 import ConfirmModal from "./components/ConfirmModal";
-import { CheckCircle2, X } from "lucide-react";
 
 export default function App() {
   const [view, setView] = useState<"dashboard" | "detail">("dashboard");
@@ -19,13 +18,6 @@ export default function App() {
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [fileIdToDelete, setFileIdToDelete] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 4000);
-  };
-
   const fetchFiles = async () => {
     try {
       const response = await fetch("/api/v1/files");
@@ -42,31 +34,45 @@ export default function App() {
     fetchFiles();
   }, []);
 
+  // 브라우저 뒤로가기 지원
+  useEffect(() => {
+    const handlePopState = () => {
+      setView("dashboard");
+      setActiveFileId(null);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   useEffect(() => {
     const es = new EventSource("/api/v1/files/subscribe");
 
-    es.addEventListener("file-status", (e: MessageEvent) => {
-      const { fileId, status } = JSON.parse(e.data) as { fileId: string | number; status: string };
+    const handleEvent = (e: MessageEvent) => {
+      console.log("[SSE file-status]", e.data);
+      try {
+        const { fileId, status } = JSON.parse(e.data) as { fileId: string | number; status: string };
 
-      const statusMap: Record<string, FileEntry["status"]> = {
-        UPLOADING: "UPLOADING",
-        CLASSIFYING: "PENDING",
-        DONE: "COMPLETED",
-      };
-      const mapped = statusMap[status];
-      if (!mapped) return;
+        const statusMap: Record<string, FileEntry["status"]> = {
+          UPLOADING: "UPLOADING",
+          CLASSIFYING: "PENDING",
+          DONE: "COMPLETED",
+          COMPLETED: "COMPLETED",
+        };
+        const mapped = statusMap[status];
+        if (!mapped) return;
 
-      setFiles(prev => {
-        const updated = prev.map(f => f.id === String(fileId) ? { ...f, status: mapped } : f);
-        if (status === "DONE") {
-          const done = updated.find(f => f.id === String(fileId));
-          if (done) showToast(`"${done.name}" 분류가 완료됐습니다.`);
-        }
-        return updated;
-      });
+        const isDone = status === "DONE" || status === "COMPLETED";
 
-      if (status === "DONE") fetchFiles();
-    });
+        setFiles(prev => prev.map(f => f.id === String(fileId) ? { ...f, status: mapped } : f));
+
+        if (isDone) fetchFiles();
+      } catch (err) {
+        console.error("[SSE parse error]", err);
+      }
+    };
+
+    es.addEventListener("file-status", handleEvent);
+    es.addEventListener("message", handleEvent);
 
     es.onerror = () => es.close();
 
@@ -145,16 +151,6 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col antialiased">
 
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 bg-emerald-600 text-white text-sm font-medium rounded-xl shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span>{toast}</span>
-          <button onClick={() => setToast(null)} className="ml-1 hover:opacity-70 transition">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
       <header className="sticky top-0 z-40 w-full bg-[#0f172a] text-white border-b border-slate-800 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -206,6 +202,7 @@ export default function App() {
               onSelectFile={(fileId) => {
                 setActiveFileId(fileId);
                 setView("detail");
+                window.history.pushState({ fileId }, "");
               }}
               onRefresh={fetchFiles}
             />
@@ -215,8 +212,7 @@ export default function App() {
             <DetailPage
               file={activeFile}
               onBack={() => {
-                setView("dashboard");
-                setActiveFileId(null);
+                window.history.back();
               }}
               onRefresh={fetchFiles}
             />

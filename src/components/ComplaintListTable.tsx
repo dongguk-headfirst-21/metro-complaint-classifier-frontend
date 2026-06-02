@@ -20,10 +20,22 @@ export default function ComplaintListTable({
   onSelectFile,
   onRefresh,
 }: ComplaintListTableProps) {
-  const formatCapacity = (mb: number) => {
-    if (mb === 0) return "0 KB";
-    if (mb < 1) return (mb * 1024).toFixed(1) + " KB";
-    return mb.toFixed(1) + " MB";
+  const formatDate = (raw: string) => {
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return raw.substring(0, 16).replace("T", " ");
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const hh = String(d.getHours()).padStart(2, "0");
+    const min = String(d.getMinutes()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+  };
+
+  const formatCapacity = (bytes: number) => {
+    if (bytes === 0) return "0 B";
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   };
 
   const getStatusBadge = (status: FileEntry["status"]) => {
@@ -67,18 +79,9 @@ export default function ComplaintListTable({
           <FileText className="w-4 h-4 text-slate-500" />
           민원 파일 목록
         </h2>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-mono font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-            {files.length} 개
-          </span>
-          <button
-            onClick={onRefresh}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
-            title="새로고침"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <span className="text-xs font-mono font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+          {files.length} 개
+        </span>
       </div>
 
       <div className="overflow-x-auto">
@@ -135,7 +138,7 @@ export default function ComplaintListTable({
                       {isComplete ? file.complaintCount : "—"}
                     </td>
                     <td className="px-6 py-4 text-xs text-slate-500 font-mono">
-                      {file.uploadedAt}
+                      {formatDate(file.uploadedAt)}
                     </td>
                     <td className="px-6 py-4">
                       {getStatusBadge(file.status)}
