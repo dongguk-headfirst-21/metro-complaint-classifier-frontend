@@ -86,7 +86,7 @@ export default function ManualProcessingPanel({ disabled = false }: { disabled?:
     setResult(null);
 
     try {
-      const response = await fetch("/api/v1/complaints", {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/complaints`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title, content }),
