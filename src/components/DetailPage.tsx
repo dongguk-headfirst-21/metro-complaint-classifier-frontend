@@ -62,6 +62,13 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
 
   const isSelectAllChecked = departSummaries.length > 0 && selectedDepts.length === departSummaries.length;
 
+  const hasPendingSelected = selectedDepts.some(name =>
+    departSummaries.find(d => d.name === name && !d.isChecked)
+  );
+  const hasCheckedSelected = selectedDepts.some(name =>
+    departSummaries.find(d => d.name === name && d.isChecked)
+  );
+
   const handleSelectAll = () => {
     if (isSelectAllChecked) {
       setSelectedDepts([]);
@@ -112,7 +119,7 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
             const fileData = await fileRes.json();
             const departs = fileData.departs ?? [];
             setDepartSummaries(departs);
-            setSelectedDepts(departs.filter((d: any) => d.isChecked).map((d: any) => d.name));
+            setSelectedDepts([]);
           }
           onRefresh();
         }, 3200);
@@ -129,7 +136,7 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
     setIsFinishing(true);
     try {
       const checkedDepartIds = departSummaries
-        .filter(d => d.isChecked)
+        .filter(d => d.isChecked && selectedDepts.includes(d.name))
         .map(d => d.departId);
 
       const response = await fetch(`/api/v1/files/${file.id}/departs/uncheck`, {
@@ -139,9 +146,14 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
       });
 
       if (response.ok) {
+        const fileRes = await fetch(`/api/v1/files/${file.id}`);
+        if (fileRes.ok) {
+          const fileData = await fileRes.json();
+          const departs = fileData.departs ?? [];
+          setDepartSummaries(departs);
+        }
         setSelectedDepts([]);
         onRefresh();
-        onBack();
       }
     } catch (err) {
       console.error(err);
@@ -274,15 +286,15 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
           <div className="p-4 border-t border-slate-100 bg-slate-50 bg-slate-100/55 flex items-center justify-end gap-3 shrink-0">
             <button
               onClick={handleCancelConfirm}
-              disabled={isFinishing}
-              className="flex-1 px-4 py-2.5 text-xs font-semibold text-rose-600 hover:text-rose-800 hover:bg-rose-50 border border-slate-200 bg-white rounded-lg transition"
+              disabled={isFinishing || !hasCheckedSelected}
+              className="flex-1 px-4 py-2.5 text-xs font-semibold text-rose-600 hover:text-rose-800 hover:bg-rose-50 border border-slate-200 bg-white rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
             >
               확인 취소
             </button>
             <button
               onClick={handleConfirm}
-              disabled={isFinishing}
-              className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition disabled:bg-blue-400"
+              disabled={isFinishing || !hasPendingSelected}
+              className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition disabled:bg-blue-400 disabled:cursor-not-allowed"
             >
               {isFinishing ? (
                 <>
