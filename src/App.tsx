@@ -74,6 +74,11 @@ export default function App() {
     es.addEventListener("file-status", handleEvent);
     es.addEventListener("message", handleEvent);
 
+    es.addEventListener("complaint-status", (e: MessageEvent) => {
+      console.log("[App SSE complaint-status]", e.data);
+      window.dispatchEvent(new CustomEvent("complaint-sse", { detail: e.data }));
+    });
+
     es.onerror = () => es.close();
 
     return () => es.close();

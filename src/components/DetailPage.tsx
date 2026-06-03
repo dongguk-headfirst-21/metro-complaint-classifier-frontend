@@ -104,11 +104,17 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
 
       if (response.ok) {
         setShowDispatchAnimation(true);
-        setTimeout(() => {
+        setTimeout(async () => {
           setShowDispatchAnimation(false);
           setIsFinishing(false);
+          const fileRes = await fetch(`/api/v1/files/${file.id}`);
+          if (fileRes.ok) {
+            const fileData = await fileRes.json();
+            const departs = fileData.departs ?? [];
+            setDepartSummaries(departs);
+            setSelectedDepts(departs.filter((d: any) => d.isChecked).map((d: any) => d.name));
+          }
           onRefresh();
-          onBack();
         }, 3200);
       } else {
         setIsFinishing(false);
