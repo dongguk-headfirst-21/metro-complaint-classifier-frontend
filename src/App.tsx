@@ -14,7 +14,7 @@ import ConfirmModal from "./components/ConfirmModal";
 export default function App() {
   const [view, setView] = useState<"dashboard" | "detail">("dashboard");
   const [files, setFiles] = useState<FileEntry[]>([]);
-  const [activeFileId, setActiveFileId] = useState<string | null>(null);
+  const [activeFile, setActiveFile] = useState<FileEntry | null>(null);
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [fileIdToDelete, setFileIdToDelete] = useState<string | null>(null);
@@ -24,6 +24,10 @@ export default function App() {
       if (response.ok) {
         const data = await response.json();
         setFiles(data.files);
+        setActiveFile(prev => {
+          if (!prev) return null;
+          return (data.files as FileEntry[]).find(f => f.id === prev.id) ?? prev;
+        });
       }
     } catch (err) {
       console.error("Failed to load files ledger:", err);
@@ -38,7 +42,7 @@ export default function App() {
   useEffect(() => {
     const handlePopState = () => {
       setView("dashboard");
-      setActiveFileId(null);
+      setActiveFile(null);
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
@@ -138,9 +142,9 @@ export default function App() {
       });
       if (response.ok) {
         setFiles(prev => prev.filter(f => f.id !== fileIdToDelete));
-        if (activeFileId === fileIdToDelete) {
+        if (activeFile?.id === fileIdToDelete) {
           setView("dashboard");
-          setActiveFileId(null);
+          setActiveFile(null);
         }
       }
     } catch (err) {
@@ -150,8 +154,6 @@ export default function App() {
       setFileIdToDelete(null);
     }
   };
-
-  const activeFile = files.find(f => f.id === activeFileId);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col antialiased">
@@ -205,9 +207,12 @@ export default function App() {
               files={files}
               onDeleteRequest={handleDeleteRequest}
               onSelectFile={(fileId) => {
-                setActiveFileId(fileId);
-                setView("detail");
-                window.history.pushState({ fileId }, "");
+                const file = files.find(f => f.id === fileId);
+                if (file) {
+                  setActiveFile(file);
+                  setView("detail");
+                  window.history.pushState({ fileId }, "");
+                }
               }}
               onRefresh={fetchFiles}
             />
