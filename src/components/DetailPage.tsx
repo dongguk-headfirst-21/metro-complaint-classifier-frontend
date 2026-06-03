@@ -4,8 +4,8 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { FileEntry, ComplaintEntry, UNCLASSIFIED } from "../types";
-import { ArrowLeft, CheckSquare, Square, FolderCheck, Info, ShieldAlert, Loader2, Send } from "lucide-react";
+import { FileEntry } from "../types";
+import { ArrowLeft, CheckSquare, Square, FolderCheck, Info, Loader2, Send } from "lucide-react";
 
 interface DepartSummary {
   departId: string;
@@ -27,7 +27,6 @@ interface DetailPageProps {
 }
 
 export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps) {
-  const [complaints, setComplaints] = useState<ComplaintEntry[]>([]);
   const [departSummaries, setDepartSummaries] = useState<DepartSummary[]>([]);
   const [activeDeptComplaints, setActiveDeptComplaints] = useState<DepartComplaint[]>([]);
   const [isLoadingComplaints, setIsLoadingComplaints] = useState(false);
@@ -40,10 +39,7 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [fileRes, complaintsRes] = await Promise.all([
-          fetch(`/api/v1/files/${file.id}`),
-          fetch(`/api/complaints?fileId=${file.id}`)
-        ]);
+        const fileRes = await fetch(`/api/v1/files/${file.id}`);
 
         if (fileRes.ok) {
           const fileData = await fileRes.json();
@@ -51,10 +47,6 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
           setDepartSummaries(departs);
           setSelectedDepts(departs.filter(d => d.isChecked).map(d => d.name));
           if (departs.length > 0) setActiveDept(departs[0].name);
-        }
-
-        if (complaintsRes.ok) {
-          setComplaints(await complaintsRes.json());
         }
       } catch (err) {
         console.error("Failed to load file detail:", err);
@@ -65,8 +57,6 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
 
     fetchData();
   }, [file.id]);
-
-  const unclassifiedComplaints = complaints.filter(c => c.department === UNCLASSIFIED);
 
   const allDeptsList = departSummaries.map(s => s.name);
 
@@ -114,11 +104,17 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
 
       if (response.ok) {
         setShowDispatchAnimation(true);
-        setTimeout(() => {
+        setTimeout(async () => {
           setShowDispatchAnimation(false);
           setIsFinishing(false);
+          const fileRes = await fetch(`/api/v1/files/${file.id}`);
+          if (fileRes.ok) {
+            const fileData = await fileRes.json();
+            const departs = fileData.departs ?? [];
+            setDepartSummaries(departs);
+            setSelectedDepts(departs.filter((d: any) => d.isChecked).map((d: any) => d.name));
+          }
           onRefresh();
-          onBack();
         }, 3200);
       } else {
         setIsFinishing(false);
@@ -273,31 +269,6 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
               )}
             </div>
 
-            <div className="p-5 border-t border-slate-200 bg-slate-50/70">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-amber-800 uppercase tracking-widest mb-3">
-                <ShieldAlert className="w-4 h-4 text-amber-600" />
-                미분류 민원함 (읽기 전용)
-              </div>
-              <div className="max-h-[130px] overflow-y-auto space-y-3 bg-white border border-slate-150 p-3 rounded-lg shadow-2xs">
-                {unclassifiedComplaints.length === 0 ? (
-                  <p className="text-[11px] text-slate-400 italic">미분류 민원이 없습니다.</p>
-                ) : (
-                  unclassifiedComplaints.map((c, idx) => (
-                    <div key={c.id} className="text-left border-b border-slate-100 last:border-b-0 pb-2 last:pb-0">
-                      <h5 className="text-xs font-bold text-slate-800 font-display">
-                        {idx + 1}. {c.title}
-                      </h5>
-                      <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                        {c.content}
-                      </p>
-                      <span className="text-[9px] font-mono font-bold text-slate-400 mt-1 block">
-                        코드: {c.complaintCode}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
           </div>
 
           <div className="p-4 border-t border-slate-100 bg-slate-50 bg-slate-100/55 flex items-center justify-end gap-3 shrink-0">
@@ -356,14 +327,14 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
             ) : (
               activeDeptComplaints.map((c, idx) => (
                 <div
-                  key={c.code ?? idx}
+                  key={idx}
                   className="p-5 rounded-xl border border-slate-150 bg-white shadow-2xs hover:border-blue-200 transition-all duration-300 relative group overflow-hidden"
                 >
                   <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-600 opacity-60"></div>
                   <div className="flex items-start justify-between gap-4 mb-2">
                     <h3 className="text-sm font-bold text-slate-800 font-display">{c.title}</h3>
                     <span className="font-mono text-[10px] font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
-                      {c.code}
+                      {typeof c.code === "object" ? (c.code as any)?.text ?? (c.code as any)?.code : c.code}
                     </span>
                   </div>
                   <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">

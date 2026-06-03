@@ -5,23 +5,37 @@
 
 import React from "react";
 import { FileEntry } from "../types";
-import { Trash2, FileText, ArrowRight, Loader2, CheckCircle2 } from "lucide-react";
+import { Trash2, FileText, ArrowRight, Loader2, CheckCircle2, RefreshCw } from "lucide-react";
 
 interface ComplaintListTableProps {
   files: FileEntry[];
   onDeleteRequest: (fileId: string) => void;
   onSelectFile: (fileId: string) => void;
+  onRefresh: () => void;
 }
 
 export default function ComplaintListTable({
   files,
   onDeleteRequest,
   onSelectFile,
+  onRefresh,
 }: ComplaintListTableProps) {
-  const formatCapacity = (mb: number) => {
-    if (mb === 0) return "0 KB";
-    if (mb < 1) return (mb * 1024).toFixed(1) + " KB";
-    return mb.toFixed(1) + " MB";
+  const formatDate = (raw: string) => {
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return raw.substring(0, 16).replace("T", " ");
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const hh = String(d.getHours()).padStart(2, "0");
+    const min = String(d.getMinutes()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+  };
+
+  const formatCapacity = (bytes: number) => {
+    if (bytes === 0) return "0 B";
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   };
 
   const getStatusBadge = (status: FileEntry["status"]) => {
@@ -124,7 +138,7 @@ export default function ComplaintListTable({
                       {isComplete ? file.complaintCount : "—"}
                     </td>
                     <td className="px-6 py-4 text-xs text-slate-500 font-mono">
-                      {file.uploadedAt}
+                      {formatDate(file.uploadedAt)}
                     </td>
                     <td className="px-6 py-4">
                       {getStatusBadge(file.status)}

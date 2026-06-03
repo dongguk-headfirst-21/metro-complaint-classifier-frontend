@@ -9,6 +9,7 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 import { ComplaintEntry } from "./src/types.js";
+import { createProxyMiddleware } from "http-proxy-middleware";
 
 dotenv.config();
 
@@ -203,6 +204,25 @@ files = [...SEED_FILES];
 complaints = [...SEED_COMPLAINTS];
 
 // --- API ROUTES ---
+// 배포 백엔드로 프록시 (로컬 라우트보다 먼저 등록)
+app.use(
+  "/api",
+  createProxyMiddleware({
+    target: "http://43.201.79.175",
+    changeOrigin: true,
+    pathRewrite: { "^/": "/api/" },
+    on: {
+      proxyReq: (proxyReq, req: any) => {
+        if (req.body && Object.keys(req.body).length > 0) {
+          const bodyData = JSON.stringify(req.body);
+          proxyReq.setHeader("Content-Type", "application/json");
+          proxyReq.setHeader("Content-Length", Buffer.byteLength(bodyData));
+          proxyReq.write(bodyData);
+        }
+      },
+    },
+  })
+);
 
 // List files
 app.get("/api/v1/files", (_req, res) => {

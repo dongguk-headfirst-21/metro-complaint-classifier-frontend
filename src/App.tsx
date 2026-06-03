@@ -18,7 +18,6 @@ export default function App() {
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [fileIdToDelete, setFileIdToDelete] = useState<string | null>(null);
-
   const fetchFiles = async () => {
     try {
       const response = await fetch("/api/v1/files");
@@ -35,23 +34,49 @@ export default function App() {
     fetchFiles();
   }, []);
 
+  // 브라우저 뒤로가기 지원
+  useEffect(() => {
+    const handlePopState = () => {
+      setView("dashboard");
+      setActiveFileId(null);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   useEffect(() => {
     const es = new EventSource("/api/v1/files/subscribe");
 
-    es.addEventListener("file-status", (e: MessageEvent) => {
-      const { fileId, status } = JSON.parse(e.data) as { fileId: string | number; status: string };
+    const handleEvent = (e: MessageEvent) => {
+      console.log("[SSE file-status]", e.data);
+      try {
+        const { fileId, status } = JSON.parse(e.data) as { fileId: string | number; status: string };
 
-      const statusMap: Record<string, FileEntry["status"]> = {
-        UPLOADING: "UPLOADING",
-        CLASSIFYING: "PENDING",
-        DONE: "COMPLETED",
-      };
-      const mapped = statusMap[status];
-      if (!mapped) return;
+        const statusMap: Record<string, FileEntry["status"]> = {
+          UPLOADING: "UPLOADING",
+          CLASSIFYING: "PENDING",
+          DONE: "COMPLETED",
+          COMPLETED: "COMPLETED",
+        };
+        const mapped = statusMap[status];
+        if (!mapped) return;
 
-      setFiles(prev => prev.map(f => f.id === String(fileId) ? { ...f, status: mapped } : f));
+        const isDone = status === "DONE" || status === "COMPLETED";
 
-      if (status === "DONE") fetchFiles();
+        setFiles(prev => prev.map(f => f.id === String(fileId) ? { ...f, status: mapped } : f));
+
+        if (isDone) fetchFiles();
+      } catch (err) {
+        console.error("[SSE parse error]", err);
+      }
+    };
+
+    es.addEventListener("file-status", handleEvent);
+    es.addEventListener("message", handleEvent);
+
+    es.addEventListener("complaint-status", (e: MessageEvent) => {
+      console.log("[App SSE complaint-status]", e.data);
+      window.dispatchEvent(new CustomEvent("complaint-sse", { detail: e.data }));
     });
 
     es.onerror = () => es.close();
@@ -74,12 +99,6 @@ export default function App() {
 
     setFiles(prev => [tempUploadingEntry, ...prev]);
 
-    setTimeout(() => {
-      setFiles(prev =>
-        prev.map(f => (f.id === tempId ? { ...f, status: "PENDING" as const } : f))
-      );
-    }, 1500);
-
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -90,8 +109,13 @@ export default function App() {
       });
 
       if (res.ok) {
-        setFiles(prev => prev.filter(f => f.id !== tempId));
-        await fetchFiles();
+        const data = await res.json();
+        const realId = String(data.fileId);
+        // temp 항목을 실제 fileId로 교체하고 PENDING 상태로 유지
+        // SSE에서 DONE 이벤트를 받으면 fetchFiles()로 최종 갱신됨
+        setFiles(prev =>
+          prev.map(f => f.id === tempId ? { ...f, id: realId, status: "PENDING" as const } : f)
+        );
       } else {
         setFiles(prev => prev.filter(f => f.id !== tempId));
       }
@@ -109,7 +133,7 @@ export default function App() {
   const handleDeleteConfirm = async () => {
     if (!fileIdToDelete) return;
     try {
-      const response = await fetch(`/api/files/${fileIdToDelete}`, {
+      const response = await fetch(`/api/v1/files/${fileIdToDelete}`, {
         method: "DELETE",
       });
       if (response.ok) {
@@ -173,7 +197,7 @@ export default function App() {
                 </div>
               </div>
               <div className="lg:col-span-6">
-                <ManualProcessingPanel />
+                <ManualProcessingPanel disabled={files.some(f => f.status === "UPLOADING" || f.status === "PENDING")} />
               </div>
             </div>
 
@@ -183,7 +207,9 @@ export default function App() {
               onSelectFile={(fileId) => {
                 setActiveFileId(fileId);
                 setView("detail");
+                window.history.pushState({ fileId }, "");
               }}
+              onRefresh={fetchFiles}
             />
           </div>
         ) : (
@@ -191,8 +217,7 @@ export default function App() {
             <DetailPage
               file={activeFile}
               onBack={() => {
-                setView("dashboard");
-                setActiveFileId(null);
+                window.history.back();
               }}
               onRefresh={fetchFiles}
             />

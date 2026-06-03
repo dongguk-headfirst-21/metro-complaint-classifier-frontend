@@ -21,6 +21,14 @@ export default defineConfig(() => {
         '/api': {
           target: 'http://43.201.79.175',
           changeOrigin: true,
+          configure: (proxy) => {
+            proxy.on('proxyRes', (proxyRes) => {
+              // SSE 응답 버퍼링 방지
+              if (proxyRes.headers['content-type']?.includes('text/event-stream')) {
+                proxyRes.headers['x-accel-buffering'] = 'no';
+              }
+            });
+          },
         },
       },
     },

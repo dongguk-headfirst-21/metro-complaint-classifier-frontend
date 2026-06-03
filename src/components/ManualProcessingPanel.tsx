@@ -13,45 +13,64 @@ interface ManualResult {
   failureReason: string | null;
 }
 
-export default function ManualProcessingPanel() {
+export default function ManualProcessingPanel({ disabled = false }: { disabled?: boolean }) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<ManualResult | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const pendingComplaintId = useRef<string | null>(null);
+  const isProcessingRef = useRef(false);
   const pendingResultData = useRef<{ department: string; complaintCode: string } | null>(null);
+  const lastSseData = useRef<{ departId: number; code: number; failureReason: string | null } | null>(null);
+
+  const applyResult = (sseData: { departId: number; code: number; failureReason: string | null }, postData?: { department: string; complaintCode: string }) => {
+    const stored = postData ?? pendingResultData.current;
+    setResult({
+      success: !sseData.failureReason,
+      department: stored?.department || String(sseData.departId ?? ""),
+      complaintCode: stored?.complaintCode || String(sseData.code ?? ""),
+      failureReason: sseData.failureReason,
+    });
+    isProcessingRef.current = false;
+    pendingResultData.current = null;
+    lastSseData.current = null;
+    setIsProcessing(false);
+    setTitle("");
+    setContent("");
+  };
 
   useEffect(() => {
-    const es = new EventSource("/api/v1/complaints/subscribe");
-
-    es.addEventListener("complaint-status", (e: MessageEvent) => {
-      const data = JSON.parse(e.data) as {
+    const handler = (e: Event) => {
+      if (!isProcessingRef.current) return;
+      const raw = (e as CustomEvent).detail;
+      const data = JSON.parse(raw) as {
         complaintId: string | number;
         departId: number;
         code: number;
         failureReason: string | null;
       };
+      // POST 응답이 이미 왔으면 부서명/코드 포함해서 표시
+      // 아직 안 왔으면 SSE 데이터만 표시 후 lastSseData에 저장
+      if (pendingResultData.current) {
+        applyResult(data);
+      } else {
+        lastSseData.current = data;
+        setResult({
+          success: !data.failureReason,
+          department: "",
+          complaintCode: "",
+          failureReason: data.failureReason,
+        });
+        isProcessingRef.current = false;
+        setIsProcessing(false);
+        setTitle("");
+        setContent("");
+      }
+    };
 
-      if (String(data.complaintId) !== pendingComplaintId.current) return;
-
-      const stored = pendingResultData.current;
-      setResult({
-        success: !data.failureReason,
-        department: stored?.department ?? "",
-        complaintCode: stored?.complaintCode ?? "",
-        failureReason: data.failureReason,
-      });
-
-      pendingComplaintId.current = null;
-      pendingResultData.current = null;
-      setIsProcessing(false);
-    });
-
-    es.onerror = () => es.close();
-
-    return () => es.close();
+    window.addEventListener("complaint-sse", handler);
+    return () => window.removeEventListener("complaint-sse", handler);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -62,6 +81,7 @@ export default function ManualProcessingPanel() {
     }
 
     setErrorMsg("");
+    isProcessingRef.current = true;
     setIsProcessing(true);
     setResult(null);
 
@@ -76,14 +96,19 @@ export default function ManualProcessingPanel() {
 
       const data = await response.json();
 
-      pendingComplaintId.current = String(data.complaintId);
-      pendingResultData.current = {
+      const postResult = {
         department: data.department ?? "",
         complaintCode: data.complaintCode ?? "",
       };
 
-      setTitle("");
-      setContent("");
+      if (lastSseData.current) {
+        // SSE가 먼저 왔으면 부서명/코드 업데이트
+        setResult(prev => prev ? { ...prev, department: postResult.department, complaintCode: postResult.complaintCode } : prev);
+        lastSseData.current = null;
+      } else {
+        pendingResultData.current = postResult;
+      }
+
     } catch (err) {
       console.error(err);
       setErrorMsg("분류 서버 연결 중 오류가 발생했습니다.");
@@ -139,13 +164,18 @@ export default function ManualProcessingPanel() {
 
           <button
             type="submit"
-            disabled={isProcessing}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 rounded-lg shadow-xs transition"
+            disabled={isProcessing || disabled}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed rounded-lg shadow-xs transition"
           >
             {isProcessing ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
                 분류 중...
+              </>
+            ) : disabled ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                파일 분류 중...
               </>
             ) : (
               <>
