@@ -20,7 +20,7 @@ export default function App() {
   const [fileIdToDelete, setFileIdToDelete] = useState<string | null>(null);
   const fetchFiles = async () => {
     try {
-      const response = await fetch("/api/v1/files");
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/files`);
       if (response.ok) {
         const data = await response.json();
         setFiles(data.files);
@@ -49,7 +49,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const es = new EventSource("/api/v1/files/subscribe");
+    const es = new EventSource(`${import.meta.env.VITE_API_BASE_URL}/api/v1/files/subscribe`);
 
     const handleEvent = (e: MessageEvent) => {
       console.log("[SSE file-status]", e.data);
@@ -107,7 +107,7 @@ export default function App() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await fetch("/api/v1/files", {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/files`, {
         method: "POST",
         body: formData,
       });
@@ -137,7 +137,7 @@ export default function App() {
   const handleDeleteConfirm = async () => {
     if (!fileIdToDelete) return;
     try {
-      const response = await fetch(`/api/v1/files/${fileIdToDelete}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/files/${fileIdToDelete}`, {
         method: "DELETE",
       });
       if (response.ok) {
