@@ -208,7 +208,7 @@ complaints = [...SEED_COMPLAINTS];
 app.use(
   "/api",
   createProxyMiddleware({
-    target: "http://43.201.79.175",
+    target: "https://dguseoulmetro.xyz",
     changeOrigin: true,
     pathRewrite: { "^/": "/api/" },
     on: {
