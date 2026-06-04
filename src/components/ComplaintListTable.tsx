@@ -5,7 +5,7 @@
 
 import React from "react";
 import { FileEntry } from "../types";
-import { Trash2, FileText, ArrowRight, Loader2, CheckCircle2, RefreshCw } from "lucide-react";
+import { Trash2, FileText, ArrowRight, Loader2, CheckCircle2, RefreshCw, SendHorizonal } from "lucide-react";
 
 interface ComplaintListTableProps {
   files: FileEntry[];
@@ -95,11 +95,11 @@ export default function ComplaintListTable({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100">
-                <th className="px-6 py-3.5">파일명</th>
-                <th className="px-6 py-3.5">크기</th>
+                <th className="px-6 py-3.5 text-center">파일명</th>
+                <th className="px-6 py-3.5 text-center">크기</th>
                 <th className="px-6 py-3.5 text-center">민원 수</th>
-                <th className="px-6 py-3.5">업로드 일자</th>
-                <th className="px-6 py-3.5">분류 상태</th>
+                <th className="px-6 py-3.5 text-center">업로드 일자</th>
+                <th className="px-6 py-3.5 text-center">분류 상태</th>
                 <th className="px-6 py-3.5 text-center">확인 / 전체 부서</th>
                 <th className="px-6 py-3.5 text-center">삭제</th>
               </tr>
@@ -131,25 +131,32 @@ export default function ComplaintListTable({
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-xs font-mono text-slate-500">
+                    <td className="px-6 py-4 text-xs font-mono text-center text-slate-500">
                       {formatCapacity(file.capacity)}
                     </td>
                     <td className="px-6 py-4 text-sm font-semibold text-center text-slate-800 font-mono">
                       {isComplete ? file.complaintCount : "—"}
                     </td>
-                    <td className="px-6 py-4 text-xs text-slate-500 font-mono">
+                    <td className="px-6 py-4 text-xs text-center text-slate-500 font-mono">
                       {formatDate(file.uploadedAt)}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 text-center">
                       {getStatusBadge(file.status)}
                     </td>
                     <td className="px-6 py-4 text-center">
                       {isComplete ? (
-                        <div className="inline-flex items-center justify-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 font-mono border border-slate-200">
-                          <span className={confirmed === total && total > 0 ? "text-emerald-600 font-bold" : ""}>{confirmed}</span>
-                          <span>/</span>
-                          <span>{total}</span>
-                        </div>
+                        total > 0 && confirmed === total ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                            <SendHorizonal className="w-3.5 h-3.5 text-emerald-500" />
+                            배부 완료
+                          </span>
+                        ) : (
+                          <div className="inline-flex items-center justify-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 font-mono border border-slate-200">
+                            <span>{confirmed}</span>
+                            <span>/</span>
+                            <span>{total}</span>
+                          </div>
+                        )
                       ) : (
                         <span className="text-slate-400 text-xs">—</span>
                       )}
