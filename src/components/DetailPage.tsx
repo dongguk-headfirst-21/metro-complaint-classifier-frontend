@@ -39,7 +39,7 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const fileRes = await fetch(`/api/v1/files/${file.id}`);
+        const fileRes = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/files/${file.id}`);
 
         if (fileRes.ok) {
           const fileData = await fileRes.json();
@@ -89,7 +89,7 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
     if (!summary) return;
 
     setIsLoadingComplaints(true);
-    fetch(`/api/v1/departs/${summary.departId}?page=0&size=50`)
+    fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/departs/${summary.departId}?page=0&size=50`)
       .then(res => res.json())
       .then(data => setActiveDeptComplaints(data.complaints ?? []))
       .catch(console.error)
@@ -103,7 +103,7 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
         .filter(d => selectedDepts.includes(d.name))
         .map(d => d.departId);
 
-      const response = await fetch(`/api/v1/files/${file.id}/departs/check`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/files/${file.id}/departs/check`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ departIds: selectedDepartIds }),
@@ -114,7 +114,7 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
         setTimeout(async () => {
           setShowDispatchAnimation(false);
           setIsFinishing(false);
-          const fileRes = await fetch(`/api/v1/files/${file.id}`);
+          const fileRes = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/files/${file.id}`);
           if (fileRes.ok) {
             const fileData = await fileRes.json();
             const departs = fileData.departs ?? [];
@@ -139,14 +139,14 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
         .filter(d => d.isChecked && selectedDepts.includes(d.name))
         .map(d => d.departId);
 
-      const response = await fetch(`/api/v1/files/${file.id}/departs/uncheck`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/files/${file.id}/departs/uncheck`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ departIds: checkedDepartIds }),
       });
 
       if (response.ok) {
-        const fileRes = await fetch(`/api/v1/files/${file.id}`);
+        const fileRes = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/files/${file.id}`);
         if (fileRes.ok) {
           const fileData = await fileRes.json();
           const departs = fileData.departs ?? [];

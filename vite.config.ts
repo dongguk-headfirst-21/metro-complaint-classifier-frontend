@@ -19,7 +19,7 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
       proxy: {
         '/api': {
-          target: 'http://43.201.79.175',
+          target: 'https://dguseoulmetro.xyz',
           changeOrigin: true,
           configure: (proxy) => {
             proxy.on('proxyRes', (proxyRes) => {
