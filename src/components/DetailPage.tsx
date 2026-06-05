@@ -89,7 +89,7 @@ export default function DetailPage({ file, onBack, onRefresh }: DetailPageProps)
     if (!summary) return;
 
     setIsLoadingComplaints(true);
-    fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/departs/${summary.departId}?page=0&size=50`)
+    fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/departs/${summary.departId}?fileId=${file.id}&page=0&size=50`)
       .then(res => res.json())
       .then(data => setActiveDeptComplaints(data.complaints ?? []))
       .catch(console.error)
