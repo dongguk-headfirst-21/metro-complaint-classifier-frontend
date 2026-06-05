@@ -13,7 +13,7 @@ interface ManualResult {
   failureReason: string | null;
 }
 
-export default function ManualProcessingPanel({ disabled = false }: { disabled?: boolean }) {
+export default function ManualProcessingPanel({ disabled = false, onProcessingChange }: { disabled?: boolean; onProcessingChange?: (v: boolean) => void }) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -36,6 +36,7 @@ export default function ManualProcessingPanel({ disabled = false }: { disabled?:
     pendingResultData.current = null;
     lastSseData.current = null;
     setIsProcessing(false);
+    onProcessingChange?.(false);
     setTitle("");
     setContent("");
   };
@@ -64,6 +65,7 @@ export default function ManualProcessingPanel({ disabled = false }: { disabled?:
         });
         isProcessingRef.current = false;
         setIsProcessing(false);
+        onProcessingChange?.(false);
         setTitle("");
         setContent("");
       }
@@ -83,6 +85,7 @@ export default function ManualProcessingPanel({ disabled = false }: { disabled?:
     setErrorMsg("");
     isProcessingRef.current = true;
     setIsProcessing(true);
+    onProcessingChange?.(true);
     setResult(null);
 
     try {
@@ -113,6 +116,7 @@ export default function ManualProcessingPanel({ disabled = false }: { disabled?:
       console.error(err);
       setErrorMsg("분류 서버 연결 중 오류가 발생했습니다.");
       setIsProcessing(false);
+      onProcessingChange?.(false);
     }
   };
 

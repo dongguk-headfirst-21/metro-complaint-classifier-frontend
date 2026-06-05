@@ -52,7 +52,7 @@ export default function FileUploadArea({ onFileUploaded, disabled = false }: Fil
 
   if (disabled) {
     return (
-      <div className="relative flex flex-col items-center justify-center h-48 px-6 border-2 border-dashed rounded-xl border-slate-200 bg-slate-50 cursor-not-allowed">
+      <div className="relative flex flex-col items-center justify-center h-full min-h-48 px-6 border-2 border-dashed rounded-xl border-slate-200 bg-slate-50 cursor-not-allowed">
         <Loader2 className="w-8 h-8 text-slate-400 animate-spin mb-3" />
         <p className="text-sm font-semibold text-slate-500 font-display">분류 처리 중...</p>
         <p className="text-xs text-slate-400 mt-1">처리가 완료된 후 업로드할 수 있습니다.</p>
@@ -66,7 +66,7 @@ export default function FileUploadArea({ onFileUploaded, disabled = false }: Fil
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`relative flex flex-col items-center justify-center h-48 px-6 border-2 border-dashed rounded-xl transition-all duration-300 group
+      className={`relative flex flex-col items-center justify-center h-full min-h-48 px-6 border-2 border-dashed rounded-xl transition-all duration-300 group
         ${disabled
           ? "border-slate-200 bg-slate-50 cursor-not-allowed opacity-60"
           : isDragging
