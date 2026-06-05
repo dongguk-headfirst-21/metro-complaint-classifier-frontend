@@ -16,6 +16,7 @@ export default function App() {
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [activeFile, setActiveFile] = useState<FileEntry | null>(null);
 
+  const [isManualProcessing, setIsManualProcessing] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [fileIdToDelete, setFileIdToDelete] = useState<string | null>(null);
   const fetchFiles = async () => {
@@ -192,14 +193,19 @@ export default function App() {
                       민원 목록 파일을 업로드하면 AI를 통해 각 민원을 자동으로 분류하여 담당 부서에 배부합니다.
                     </p>
                   </div>
-                  <FileUploadArea
-                    onFileUploaded={handleFileUploaded}
-                    disabled={files.some(f => f.status === "UPLOADING" || f.status === "PENDING")}
-                  />
+                  <div className="flex-1">
+                    <FileUploadArea
+                      onFileUploaded={handleFileUploaded}
+                      disabled={isManualProcessing || files.some(f => f.status === "UPLOADING" || f.status === "PENDING")}
+                    />
+                  </div>
                 </div>
               </div>
               <div className="lg:col-span-6">
-                <ManualProcessingPanel disabled={files.some(f => f.status === "UPLOADING" || f.status === "PENDING")} />
+                <ManualProcessingPanel
+                  disabled={files.some(f => f.status === "UPLOADING" || f.status === "PENDING")}
+                  onProcessingChange={setIsManualProcessing}
+                />
               </div>
             </div>
 
