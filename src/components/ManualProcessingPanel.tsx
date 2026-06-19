@@ -37,8 +37,6 @@ export default function ManualProcessingPanel({ disabled = false, onProcessingCh
     lastSseData.current = null;
     setIsProcessing(false);
     onProcessingChange?.(false);
-    setTitle("");
-    setContent("");
   };
 
   useEffect(() => {
@@ -66,8 +64,6 @@ export default function ManualProcessingPanel({ disabled = false, onProcessingCh
         isProcessingRef.current = false;
         setIsProcessing(false);
         onProcessingChange?.(false);
-        setTitle("");
-        setContent("");
       }
     };
 
